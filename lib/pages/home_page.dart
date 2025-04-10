@@ -15,7 +15,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  mp.MapboxMap? mapboxMapController;
+  mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
 
   @override
@@ -33,24 +33,30 @@ class _HomePageState extends State<HomePage> {
 
   void _onMapCreated(mp.MapboxMap? controller) async {
     setState(() {
-      mapboxMapController = controller;
+      mapboxMap = controller;
     });
-    mapboxMapController?.location.updateSettings(
+    mapboxMap?.location.updateSettings(
       mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
     );
   }
 
+  var destination = mp.Point(coordinates: mp.Position(35.029994, 32.314459));
   void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
-    var origin = mp.Point(coordinates: mp.Position(35.0432, 32.3143));
-    var destination = mp.Point(coordinates: mp.Position(35.2043, 32.1896));
+    var currentPosition = await gl.Geolocator.getCurrentPosition();
+    var origin = mp.Point(
+      coordinates: mp.Position(
+        currentPosition.longitude,
+        currentPosition.latitude,
+      ),
+    );
 
     var featureCollection = await getDirectionsRoute(origin, destination);
 
-    await mapboxMapController?.style.addSource(
+    await mapboxMap?.style.addSource(
       mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
     );
 
-    await mapboxMapController?.style.addLayer(
+    await mapboxMap?.style.addLayer(
       mp.LineLayer(
         id: "route_layer",
         sourceId: "route",
@@ -88,12 +94,34 @@ class _HomePageState extends State<HomePage> {
       distanceFilter: 100,
     );
 
+    // consider FreeDriveMode maybe
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
-    ).listen((gl.Position position) {
-      if (mapboxMapController != null) {
-        print(position);
+    ).listen((gl.Position position) async {
+      if (mapboxMap != null) {
+        var origin = mp.Point(
+          coordinates: mp.Position(position.longitude, position.latitude),
+        );
+        await mapboxMap?.style.removeStyleLayer("route_layer");
+        await mapboxMap?.style.removeStyleSource("route");
+
+        var featureCollection = await getDirectionsRoute(origin, destination);
+
+        await mapboxMap?.style.addSource(
+          mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
+        );
+
+        await mapboxMap?.style.addLayer(
+          mp.LineLayer(
+            id: "route_layer",
+            sourceId: "route",
+            lineJoin: mp.LineJoin.ROUND,
+            lineCap: mp.LineCap.ROUND,
+            lineColor: Colors.purple.value,
+            lineWidth: 6.0,
+          ),
+        );
       }
     });
   }
@@ -105,7 +133,7 @@ class _HomePageState extends State<HomePage> {
 
   void createMarker(mp.Point point) async {
     final pointAnnotationManager =
-        await mapboxMapController?.annotations.createPointAnnotationManager();
+        await mapboxMap?.annotations.createPointAnnotationManager();
     final Uint8List imageData = await loadMarkerImage();
     mp.PointAnnotationOptions pointAnnotationOptions =
         mp.PointAnnotationOptions(image: imageData, geometry: point);
@@ -121,8 +149,8 @@ class _HomePageState extends State<HomePage> {
         styleUri: mp.MapboxStyles.MAPBOX_STREETS,
         onStyleLoadedListener: _onStyleLoadedCallback,
         cameraOptions: mp.CameraOptions(
-          zoom: 8,
-          center: mp.Point(coordinates: mp.Position(35.0432, 32.3143)),
+          zoom: 13,
+          center: mp.Point(coordinates: mp.Position(35.031363, 32.317301)),
         ),
       ),
     );
