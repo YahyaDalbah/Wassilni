@@ -8,13 +8,13 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:wassilni/helpers/directions_handler.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+class Map extends StatefulWidget {
+  const Map({super.key});
   @override
-  State<HomePage> createState() => _HomePageState();
+  State<Map> createState() => _Map();
 }
 
-class _HomePageState extends State<HomePage> {
+class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
 
