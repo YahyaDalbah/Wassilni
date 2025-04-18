@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:http/http.dart' as http;
@@ -25,6 +24,7 @@ Future<Map<String, Object>> getDirectionsRoute(
     // Create a GeoJSON feature from the route geometry
     final routeFeature = {
       "type": "Feature",
+      "id": "route_line",
       "properties": {},
       "geometry": geometry,
     };

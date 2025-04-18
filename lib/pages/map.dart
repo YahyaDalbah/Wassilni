@@ -103,24 +103,24 @@ class _Map extends State<Map> {
         var origin = mp.Point(
           coordinates: mp.Position(position.longitude, position.latitude),
         );
-        await mapboxMap?.style.removeStyleLayer("route_layer");
-        await mapboxMap?.style.removeStyleSource("route");
 
         var featureCollection = await getDirectionsRoute(origin, destination);
 
-        await mapboxMap?.style.addSource(
-          mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
-        );
-
-        await mapboxMap?.style.addLayer(
-          mp.LineLayer(
-            id: "route_layer",
-            sourceId: "route",
-            lineJoin: mp.LineJoin.ROUND,
-            lineCap: mp.LineCap.ROUND,
-            lineColor: Colors.purple.value,
-            lineWidth: 6.0,
-          ),
+        var features = featureCollection['features'] as List;
+        var rawCods = features[0]["geometry"]["coordinates"] as List;
+        var cods =
+            rawCods
+                .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
+                .toList();
+        await mapboxMap?.style.updateGeoJSONSourceFeatures(
+          "route",
+          "updated_route",
+          [
+            mp.Feature(
+              id: "route_line", //same feature id that we used to create the source
+              geometry: mp.LineString(coordinates: cods),
+            ),
+          ],
         );
       }
     });
