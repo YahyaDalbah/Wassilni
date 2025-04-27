@@ -6,7 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
+import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
+import 'package:wassilni/providers/fare_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -50,8 +52,13 @@ class _Map extends State<Map> {
       ),
     );
 
-    var featureCollection = await getDirectionsRoute(origin, destination);
-
+    var routeData = await getDirectionsRoute(origin, destination);
+    var featureCollection = routeData["featureCollection"];
+    var estimatedFare = routeData["estimatedFare"];
+    if (context.mounted) {
+      Provider.of<FareProvider>(context, listen: false).estimatedFare =
+          estimatedFare;
+    }
     await mapboxMap?.style.addSource(
       mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
     );
@@ -103,8 +110,8 @@ class _Map extends State<Map> {
           coordinates: mp.Position(position.longitude, position.latitude),
         );
 
-        var featureCollection = await getDirectionsRoute(origin, destination);
-
+        var routeData = await getDirectionsRoute(origin, destination);
+        var featureCollection = routeData["featureCollection"];
         var features = featureCollection['features'] as List;
         var rawCods = features[0]["geometry"]["coordinates"] as List;
         var cods =
