@@ -94,7 +94,6 @@ class _Map extends State<Map> {
       distanceFilter: 100,
     );
 
-    // consider FreeDriveMode maybe
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
