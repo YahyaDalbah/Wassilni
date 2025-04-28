@@ -8,7 +8,8 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
-import 'package:wassilni/providers/map_provider.dart';
+import 'package:wassilni/providers/destination_provider.dart';
+import 'package:wassilni/providers/fare_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -20,13 +21,13 @@ class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
 
-  late MapProvider _destinationProvider;
+  late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _destinationProvider = Provider.of<MapProvider>(context);
+    _destinationProvider = Provider.of<DestinationProvider>(context);
   }
 
   @override
@@ -65,7 +66,7 @@ class _Map extends State<Map> {
     var featureCollection = routeData["featureCollection"];
     var estimatedFare = routeData["estimatedFare"];
     if (context.mounted) {
-      Provider.of<MapProvider>(context, listen: false).estimatedFare =
+      Provider.of<FareProvider>(context, listen: false).estimatedFare =
           estimatedFare;
     }
     await mapboxMap?.style.addSource(
@@ -87,8 +88,11 @@ class _Map extends State<Map> {
   }
 
   Future<void> _showDefaultView() async {
-    await mapboxMap?.style.removeStyleLayer("route_layer");
-    await mapboxMap?.style.removeStyleSource("route");
+    bool? layerExists = await mapboxMap?.style.styleLayerExists("route_layer");
+    if (mapboxMap != null && layerExists != null && layerExists) {
+      await mapboxMap?.style.removeStyleLayer("route_layer");
+      await mapboxMap?.style.removeStyleSource("route");
+    }
   }
 
   void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
