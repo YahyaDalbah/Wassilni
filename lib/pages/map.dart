@@ -8,7 +8,7 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
-import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/providers/map_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -20,10 +20,19 @@ class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
 
+  late MapProvider _destinationProvider;
+  mp.CameraOptions? _initialCameraOptions;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _destinationProvider = Provider.of<MapProvider>(context);
+  }
+
   @override
   void initState() {
     super.initState();
-
+    _initializeCamera();
     _setupPositionTracking();
   }
 
@@ -42,8 +51,8 @@ class _Map extends State<Map> {
     );
   }
 
-  var destination = mp.Point(coordinates: mp.Position(35.029994, 32.314459));
-  void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
+  Future<void> _initializeRoute() async {
+    var destination = _destinationProvider.destination!;
     var currentPosition = await gl.Geolocator.getCurrentPosition();
     var origin = mp.Point(
       coordinates: mp.Position(
@@ -56,7 +65,7 @@ class _Map extends State<Map> {
     var featureCollection = routeData["featureCollection"];
     var estimatedFare = routeData["estimatedFare"];
     if (context.mounted) {
-      Provider.of<FareProvider>(context, listen: false).estimatedFare =
+      Provider.of<MapProvider>(context, listen: false).estimatedFare =
           estimatedFare;
     }
     await mapboxMap?.style.addSource(
@@ -75,6 +84,42 @@ class _Map extends State<Map> {
     );
 
     createMarker(destination);
+  }
+
+  Future<void> _showDefaultView() async {
+    await mapboxMap?.style.removeStyleLayer("route_layer");
+    await mapboxMap?.style.removeStyleSource("route");
+  }
+
+  void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
+    if (_destinationProvider.destination != null) {
+      _initializeRoute();
+    } else {
+      _showDefaultView();
+    }
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      final position = await gl.Geolocator.getCurrentPosition();
+
+      setState(() {
+        _initialCameraOptions = mp.CameraOptions(
+          center: mp.Point(
+            coordinates: mp.Position(position.longitude, position.latitude),
+          ),
+          zoom: 13.0,
+        );
+      });
+    } catch (e) {
+      // Fallback to default position
+      setState(() {
+        _initialCameraOptions = mp.CameraOptions(
+          center: mp.Point(coordinates: mp.Position(35.031363, 32.317301)),
+          zoom: 13.0,
+        );
+      });
+    }
   }
 
   Future<void> _setupPositionTracking() async {
@@ -105,10 +150,11 @@ class _Map extends State<Map> {
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((gl.Position position) async {
-      if (mapboxMap != null) {
+      if (mapboxMap != null && _destinationProvider.destination != null) {
         var origin = mp.Point(
           coordinates: mp.Position(position.longitude, position.latitude),
         );
+        var destination = _destinationProvider.destination!;
 
         var routeData = await getDirectionsRoute(origin, destination);
         var featureCollection = routeData["featureCollection"];
@@ -150,15 +196,15 @@ class _Map extends State<Map> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: mp.MapWidget(
-        onMapCreated: _onMapCreated,
-        styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-        onStyleLoadedListener: _onStyleLoadedCallback,
-        cameraOptions: mp.CameraOptions(
-          zoom: 13,
-          center: mp.Point(coordinates: mp.Position(35.031363, 32.317301)),
-        ),
-      ),
+      body:
+          _initialCameraOptions == null
+              ? Center(child: CircularProgressIndicator())
+              : mp.MapWidget(
+                onMapCreated: _onMapCreated,
+                styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+                onStyleLoadedListener: _onStyleLoadedCallback,
+                cameraOptions: _initialCameraOptions,
+              ),
     );
   }
 }

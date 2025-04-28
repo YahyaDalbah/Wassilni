@@ -5,13 +5,13 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/map.dart';
-import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/providers/map_provider.dart';
 
 void main() async {
   await setup();
   runApp(
     ChangeNotifierProvider(
-      create: (context) => FareProvider(),
+      create: (context) => MapProvider(),
       child: const MyApp(),
     ),
   );
