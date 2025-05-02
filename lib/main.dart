@@ -7,6 +7,7 @@ import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/map.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/pages/home_page.dart';
 
 void main() async {
   await setup();
@@ -33,6 +34,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'Flutter Demo', home: const Map());
+    return MaterialApp(title: 'Flutter Demo', home: HomePage());
   }
 }
