@@ -58,12 +58,74 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
     userPositionStream?.cancel();
     super.dispose();
   }
-
-  void _onMapCreated(mp.MapboxMap controller) {
+  void _onMapCreated(mp.MapboxMap controller) async {
     mapboxMap = controller;
     mapboxMap?.location.updateSettings(
       mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
     );
+
+    // if we have both current position and destination fit camera to show both
+    if (_currentPosition != null && _destinationProvider.destination != null) {
+      await _fitCameraToBounds();
+    }
+  }
+
+  Future<void> _fitCameraToBounds() async {
+    if (mapboxMap == null || _currentPosition == null || _destinationProvider.destination == null) return;
+
+    final destination = _destinationProvider.destination!;
+
+    //a list of coordinates to fit in the camera view
+    final List<mp.Point> points = [
+      mp.Point(
+          coordinates: mp.Position(_currentPosition!.longitude, _currentPosition!.latitude)
+      ),
+      mp.Point(
+          coordinates: mp.Position(
+              destination.coordinates.lng.toDouble(),
+              destination.coordinates.lat.toDouble()
+          )
+      )
+    ];
+
+    //calculated the southwest and northeast points for the bounds
+    final double minLon = [_currentPosition!.longitude, destination.coordinates.lng.toDouble()]
+        .reduce((a, b) => a < b ? a : b);
+    final double minLat = [_currentPosition!.latitude, destination.coordinates.lat.toDouble()]
+        .reduce((a, b) => a < b ? a : b);
+    final double maxLon = [_currentPosition!.longitude, destination.coordinates.lng.toDouble()]
+        .reduce((a, b) => a > b ? a : b);
+    final double maxLat = [_currentPosition!.latitude, destination.coordinates.lat.toDouble()]
+        .reduce((a, b) => a > b ? a : b);
+
+    //create the bounds
+    final bounds = mp.CoordinateBounds(
+        southwest: mp.Point(coordinates: mp.Position(minLon, minLat)),
+        northeast: mp.Point(coordinates: mp.Position(maxLon, maxLat)),
+        infiniteBounds: false
+    );
+
+    //use cameraForCoordinateBounds with all required parameters
+    final cameraOptions = await mapboxMap?.cameraForCoordinateBounds(
+        bounds,               // bounds
+        mp.MbxEdgeInsets(     // padding
+            top: 100,
+            left: 50,
+            bottom: 200,
+            right: 50
+        ),
+        0.0,                 // bearing
+        0.0,                 // pitch
+        null,                // maxZoom (null means no limit)
+        null                 // minZoom (null means no limit)
+    );
+
+    if (cameraOptions != null) {
+      await mapboxMap?.flyTo(
+        cameraOptions,
+        mp.MapAnimationOptions(duration: 1000),
+      );
+    }
   }
 
   Future<void> _fetchAddresses() async {
@@ -122,37 +184,33 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
       _currentPosition = position;
 
       //if we have a destination, set camera to fit both points
-      //not working yet!!
       if (_destinationProvider.destination != null) {
         final destination = _destinationProvider.destination!;
 
-        //create southwest and northeast points for the camera bounds
-        final southwest = mp.Point(coordinates: mp.Position(
-          position.longitude - 0.05,
-          position.latitude - 0.05,
-        ));
+        //create points for origin and destination
+        final originPoint = mp.Point(
+          coordinates: mp.Position(position.longitude, position.latitude),
+        );
 
-        final northeast = mp.Point(coordinates: mp.Position(
-          destination.coordinates.lng.toDouble() + 0.05,  //connvert num to double
-          destination.coordinates.lat.toDouble() + 0.05,
-        ));
-
-        //create a coordinate bounds object
-        final bounds = mp.CoordinateBounds(
-          southwest: southwest,
-          northeast: northeast, infiniteBounds: true,
+        final destinationPoint = mp.Point(
+          coordinates: mp.Position(
+            destination.coordinates.lng.toDouble(),
+            destination.coordinates.lat.toDouble(),
+          ),
         );
 
         setState(() {
+          //instead of calculating a center point manually, we'll use cameraForCoordinates
+          //in the _onMapCreated method after the map is initialized
           _initialCameraOptions = mp.CameraOptions(
-            center: mp.Point( //set center to midpoint of route
+            zoom: 12.0,
+            //set initial center to midpoint while waiting for map to load
+            center: mp.Point(
               coordinates: mp.Position(
                 (position.longitude + destination.coordinates.lng.toDouble()) / 2,
                 (position.latitude + destination.coordinates.lat.toDouble()) / 2,
               ),
             ),
-            padding: mp.MbxEdgeInsets(top: 100, left: 50, bottom: 150, right: 50),
-            zoom: 12.0,
           );
           _isLoading = false;
         });
@@ -169,7 +227,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
       }
     } catch (e) {
       print('Error initializing camera: $e');
-      //fallback to default position
+      //back to default position
       setState(() {
         _initialCameraOptions = mp.CameraOptions(
           center: mp.Point(coordinates: mp.Position(35.031363, 32.317301)),
@@ -332,6 +390,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
     if (_destinationProvider.destination != null) {
       await _initializeRoute();
+      await _fitCameraToBounds(); // Ensure camera shows the entire route after it's loaded
     }
   }
 
