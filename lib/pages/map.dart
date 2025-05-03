@@ -50,6 +50,78 @@ class _Map extends State<Map> {
     mapboxMap?.location.updateSettings(
       mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
     );
+    await _fitCameraToBounds();
+  }
+
+  Future<void> _fitCameraToBounds() async {
+    var currentPosition = await gl.Geolocator.getCurrentPosition();
+    if (mapboxMap == null || _destinationProvider.destination == null) return;
+
+    final destination = _destinationProvider.destination!;
+
+    //a list of coordinates to fit in the camera view
+    final List<mp.Point> points = [
+      mp.Point(
+        coordinates: mp.Position(
+          currentPosition.longitude,
+          currentPosition.latitude,
+        ),
+      ),
+      mp.Point(
+        coordinates: mp.Position(
+          destination.coordinates.lng.toDouble(),
+          destination.coordinates.lat.toDouble(),
+        ),
+      ),
+    ];
+
+    //calculated the southwest and northeast points for the bounds
+    final double minLon = [
+      currentPosition.longitude,
+      destination.coordinates.lng.toDouble(),
+    ].reduce((a, b) => a < b ? a : b);
+    final double minLat = [
+      currentPosition.latitude,
+      destination.coordinates.lat.toDouble(),
+    ].reduce((a, b) => a < b ? a : b);
+    final double maxLon = [
+      currentPosition.longitude,
+      destination.coordinates.lng.toDouble(),
+    ].reduce((a, b) => a > b ? a : b);
+    final double maxLat = [
+      currentPosition.latitude,
+      destination.coordinates.lat.toDouble(),
+    ].reduce((a, b) => a > b ? a : b);
+
+    //create the bounds
+    final bounds = mp.CoordinateBounds(
+      southwest: mp.Point(coordinates: mp.Position(minLon, minLat)),
+      northeast: mp.Point(coordinates: mp.Position(maxLon, maxLat)),
+      infiniteBounds: false,
+    );
+
+    //use cameraForCoordinateBounds with all required parameters
+    final cameraOptions = await mapboxMap?.cameraForCoordinateBounds(
+      bounds, // bounds
+      mp.MbxEdgeInsets(
+        // padding
+        top: 100,
+        left: 50,
+        bottom: 200,
+        right: 50,
+      ),
+      0.0, // bearing
+      0.0, // pitch
+      null, // maxZoom (null means no limit)
+      null, // minZoom (null means no limit)
+    );
+
+    if (cameraOptions != null) {
+      await mapboxMap?.flyTo(
+        cameraOptions,
+        mp.MapAnimationOptions(duration: 1000),
+      );
+    }
   }
 
   Future<void> _initializeRoute() async {
