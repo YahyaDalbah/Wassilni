@@ -28,7 +28,6 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
   late DestinationProvider _destinationProvider;
-  bool _isLoading = true;
   gl.Position? _currentPosition;
   String _originAddress = 'Finding your location...';
   String _destinationAddress = 'Loading destination...';
