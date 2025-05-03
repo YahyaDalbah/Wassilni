@@ -14,6 +14,8 @@ import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/pages/map.dart';
+
 
 class PositionDestinationPage extends StatefulWidget {
   const PositionDestinationPage({super.key});
@@ -433,12 +435,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
           //map
           _isLoading
               ? Center(child: CircularProgressIndicator())
-              : mp.MapWidget(
-            onMapCreated: _onMapCreated,
-            styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-            onStyleLoadedListener: _onStyleLoadedCallback,
-            cameraOptions: _initialCameraOptions,
-          ),
+              : const Map(),
 
           //top address bar
           Positioned(
