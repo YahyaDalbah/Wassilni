@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
+import 'package:wassilni/pages/Component/input_field.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/pages/auth/verify_email_page.dart';
 
@@ -96,10 +97,13 @@ class _RegisterpageState extends State<Registerpage> {
         ),
       );
     } catch (e) {
-      print("Email send failed: $e");
+  
+      debugPrint("Email send failed: $e");
+      
+      if (!mounted) return;
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to send verification email"),backgroundColor: Colors.red,),
-
       );
     }
   }
@@ -230,54 +234,6 @@ class _RegisterpageState extends State<Registerpage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class InputField extends StatelessWidget {
-  final TextEditingController controller;
-  final FormFieldValidator<String> validate;
-  final String text;
-  final String? prefixText;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  const InputField({
-    super.key,
-    required this.controller,
-    required this.validate,
-    required this.text,
-    this.prefixText,
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(
-        prefixText: prefixText,
-        prefixStyle: TextStyle(color: Colors.white, fontSize: 18),
-        label: RichText(
-          text: TextSpan(
-            text: text,
-            style: TextStyle(color: Colors.grey, fontSize: 20),
-            children: <TextSpan>[
-              TextSpan(text: '*', style: TextStyle(color: Colors.red)),
-            ],
-          ),
-        ),
-        enabledBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white54),
-        ),
-        focusedBorder: UnderlineInputBorder(
-          borderSide: BorderSide(color: Colors.white),
-        ),
-      ),
-      style: TextStyle(color: Colors.white, fontSize: 20),
-      keyboardType: keyboardType,
-      obscureText: obscureText,
-      validator: validate,
     );
   }
 }
