@@ -4,6 +4,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/firebase_options.dart';
+import 'package:wassilni/pages/auth/information_page.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
+import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/map.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
@@ -34,6 +37,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'Flutter Demo', home: HomePage());
+    return MaterialApp(title: 'Flutter Demo', home: const Registerpage());
   }
 }
