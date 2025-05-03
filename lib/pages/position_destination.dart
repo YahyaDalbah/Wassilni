@@ -435,7 +435,12 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
           //map
           _isLoading
               ? Center(child: CircularProgressIndicator())
-              : const Map(),
+              : mp.MapWidget(
+            onMapCreated: _onMapCreated,
+            styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+            onStyleLoadedListener: _onStyleLoadedCallback,
+            cameraOptions: _initialCameraOptions,
+          ),
 
           //top address bar
           Positioned(
