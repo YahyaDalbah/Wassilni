@@ -16,21 +16,19 @@ import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/map.dart';
 
-
 class PositionDestinationPage extends StatefulWidget {
   const PositionDestinationPage({super.key});
 
   @override
-  State<PositionDestinationPage> createState() => _PositionDestinationPageState();
+  State<PositionDestinationPage> createState() =>
+      _PositionDestinationPageState();
 }
 
 class _PositionDestinationPageState extends State<PositionDestinationPage> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
-  mp.CameraOptions? _initialCameraOptions;
   late DestinationProvider _destinationProvider;
   bool _isLoading = true;
-  bool _routeInitialized = false;
   gl.Position? _currentPosition;
   String _originAddress = 'Finding your location...';
   String _destinationAddress = 'Loading destination...';
@@ -50,8 +48,6 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
-    _setupPositionTracking();
     _fetchAddresses();
   }
 
@@ -59,75 +55,6 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   void dispose() {
     userPositionStream?.cancel();
     super.dispose();
-  }
-  void _onMapCreated(mp.MapboxMap controller) async {
-    mapboxMap = controller;
-    mapboxMap?.location.updateSettings(
-      mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
-    );
-
-    // if we have both current position and destination fit camera to show both
-    if (_currentPosition != null && _destinationProvider.destination != null) {
-      await _fitCameraToBounds();
-    }
-  }
-
-  Future<void> _fitCameraToBounds() async {
-    if (mapboxMap == null || _currentPosition == null || _destinationProvider.destination == null) return;
-
-    final destination = _destinationProvider.destination!;
-
-    //a list of coordinates to fit in the camera view
-    final List<mp.Point> points = [
-      mp.Point(
-          coordinates: mp.Position(_currentPosition!.longitude, _currentPosition!.latitude)
-      ),
-      mp.Point(
-          coordinates: mp.Position(
-              destination.coordinates.lng.toDouble(),
-              destination.coordinates.lat.toDouble()
-          )
-      )
-    ];
-
-    //calculated the southwest and northeast points for the bounds
-    final double minLon = [_currentPosition!.longitude, destination.coordinates.lng.toDouble()]
-        .reduce((a, b) => a < b ? a : b);
-    final double minLat = [_currentPosition!.latitude, destination.coordinates.lat.toDouble()]
-        .reduce((a, b) => a < b ? a : b);
-    final double maxLon = [_currentPosition!.longitude, destination.coordinates.lng.toDouble()]
-        .reduce((a, b) => a > b ? a : b);
-    final double maxLat = [_currentPosition!.latitude, destination.coordinates.lat.toDouble()]
-        .reduce((a, b) => a > b ? a : b);
-
-    //create the bounds
-    final bounds = mp.CoordinateBounds(
-        southwest: mp.Point(coordinates: mp.Position(minLon, minLat)),
-        northeast: mp.Point(coordinates: mp.Position(maxLon, maxLat)),
-        infiniteBounds: false
-    );
-
-    //use cameraForCoordinateBounds with all required parameters
-    final cameraOptions = await mapboxMap?.cameraForCoordinateBounds(
-        bounds,               // bounds
-        mp.MbxEdgeInsets(     // padding
-            top: 100,
-            left: 50,
-            bottom: 200,
-            right: 50
-        ),
-        0.0,                 // bearing
-        0.0,                 // pitch
-        null,                // maxZoom (null means no limit)
-        null                 // minZoom (null means no limit)
-    );
-
-    if (cameraOptions != null) {
-      await mapboxMap?.flyTo(
-        cameraOptions,
-        mp.MapAnimationOptions(duration: 1000),
-      );
-    }
   }
 
   Future<void> _fetchAddresses() async {
@@ -159,7 +86,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   Future<String> _getAddressFromCoordinates(double lat, double lng) async {
     try {
       final url = Uri.parse(
-          'https://api.mapbox.com/geocoding/v5/mapbox.places/$lng,$lat.json?access_token=${await _getAccessToken()}'
+        'https://api.mapbox.com/geocoding/v5/mapbox.places/$lng,$lat.json?access_token=${await _getAccessToken()}',
       );
 
       final response = await http.get(url);
@@ -180,229 +107,16 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
     return dotenv.env["MAPBOX_ACCESS_TOKEN"]!;
   }
 
-  Future<void> _initializeCamera() async {
-    try {
-      final position = await gl.Geolocator.getCurrentPosition();
-      _currentPosition = position;
-
-      //if we have a destination, set camera to fit both points
-      if (_destinationProvider.destination != null) {
-        final destination = _destinationProvider.destination!;
-
-        //create points for origin and destination
-        final originPoint = mp.Point(
-          coordinates: mp.Position(position.longitude, position.latitude),
-        );
-
-        final destinationPoint = mp.Point(
-          coordinates: mp.Position(
-            destination.coordinates.lng.toDouble(),
-            destination.coordinates.lat.toDouble(),
-          ),
-        );
-
-        setState(() {
-          //instead of calculating a center point manually, we'll use cameraForCoordinates
-          //in the _onMapCreated method after the map is initialized
-          _initialCameraOptions = mp.CameraOptions(
-            zoom: 12.0,
-            //set initial center to midpoint while waiting for map to load
-            center: mp.Point(
-              coordinates: mp.Position(
-                (position.longitude + destination.coordinates.lng.toDouble()) / 2,
-                (position.latitude + destination.coordinates.lat.toDouble()) / 2,
-              ),
-            ),
-          );
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _initialCameraOptions = mp.CameraOptions(
-            center: mp.Point(
-              coordinates: mp.Position(position.longitude, position.latitude),
-            ),
-            zoom: 13.0,
-          );
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      print('Error initializing camera: $e');
-      //back to default position
-      setState(() {
-        _initialCameraOptions = mp.CameraOptions(
-          center: mp.Point(coordinates: mp.Position(35.031363, 32.317301)),
-          zoom: 13.0,
-        );
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _setupPositionTracking() async {
-    bool serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location services are disabled'))
-      );
-      return;
-    }
-
-    gl.LocationPermission permission = await gl.Geolocator.checkPermission();
-    if (permission == gl.LocationPermission.denied) {
-      permission = await gl.Geolocator.requestPermission();
-      if (permission == gl.LocationPermission.denied) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Location permissions are denied'))
-        );
-        return;
-      }
-    }
-
-    if (permission == gl.LocationPermission.deniedForever) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location permissions are permanently denied'))
-      );
-      return;
-    }
-
-    gl.LocationSettings locationSettings = gl.LocationSettings(
-      accuracy: gl.LocationAccuracy.high,
-      distanceFilter: 100,
-    );
-
-    userPositionStream?.cancel();
-    userPositionStream = gl.Geolocator.getPositionStream(
-      locationSettings: locationSettings,
-    ).listen((gl.Position position) async {
-      _currentPosition = position;
-
-      if (mapboxMap != null && _destinationProvider.destination != null && _routeInitialized) {
-        var origin = mp.Point(
-          coordinates: mp.Position(position.longitude, position.latitude),
-        );
-        var destination = _destinationProvider.destination!;
-
-        var routeData = await getDirectionsRoute(origin, destination);
-        var featureCollection = routeData["featureCollection"];
-        var features = featureCollection['features'] as List;
-        var rawCoords = features[0]["geometry"]["coordinates"] as List;
-        var coords = rawCoords
-            .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
-            .toList();
-
-        try {
-          await mapboxMap?.style.updateGeoJSONSourceFeatures(
-            "route",
-            "updated_route",
-            [
-              mp.Feature(
-                id: "route_line",
-                geometry: mp.LineString(coordinates: coords),
-              ),
-            ],
-          );
-        } catch (e) {
-          print('Error updating route: $e');
-        }
-      }
-    });
-  }
-
-  Future<void> _initializeRoute() async {
-    if (_destinationProvider.destination == null || _currentPosition == null) return;
-
-    var destination = _destinationProvider.destination!;
-    var origin = mp.Point(
-      coordinates: mp.Position(
-        _currentPosition!.longitude,
-        _currentPosition!.latitude,
-      ),
-    );
-
-    try {
-      var routeData = await getDirectionsRoute(origin, destination);
-      var featureCollection = routeData["featureCollection"];
-      var estimatedFare = routeData["estimatedFare"];
-      if (context.mounted) {
-        Provider.of<FareProvider>(context, listen: false).estimatedFare = estimatedFare;
-      }
-
-      await mapboxMap?.style.addSource(
-        mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
-      );
-
-      await mapboxMap?.style.addLayer(
-        mp.LineLayer(
-          id: "route_layer",
-          sourceId: "route",
-          lineJoin: mp.LineJoin.ROUND,
-          lineCap: mp.LineCap.ROUND,
-          lineColor: Colors.purple.value,
-          lineWidth: 6.0,
-        ),
-      );
-
-      _createMarker(destination);
-      setState(() {
-        _routeInitialized = true;
-      });
-    } catch (e) {
-      print('Error initializing route: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading route. Please try again.'))
-      );
-    }
-  }
-
-  Future<Uint8List> _loadMarkerImage() async {
-    try {
-      var byteData = await rootBundle.load("assets/location.png");
-      return byteData.buffer.asUint8List();
-    } catch (e) {
-      //create a fallback marker image if asset can't be loaded
-      final size = 64;
-      final pictureRecorder = ui.PictureRecorder();
-      final canvas = Canvas(pictureRecorder);
-      final paint = Paint()..color = Colors.red;
-
-      canvas.drawCircle(Offset(size / 2, size / 2), size / 2, paint);
-
-      final img = await pictureRecorder.endRecording().toImage(size, size);
-      final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
-      return byteData!.buffer.asUint8List();
-    }
-  }
-
-  void _createMarker(mp.Point point) async {
-    try {
-      final pointAnnotationManager =
-      await mapboxMap?.annotations.createPointAnnotationManager();
-      final Uint8List imageData = await _loadMarkerImage();
-      mp.PointAnnotationOptions pointAnnotationOptions =
-      mp.PointAnnotationOptions(image: imageData, geometry: point);
-
-      pointAnnotationManager?.create(pointAnnotationOptions);
-    } catch (e) {
-      print('Error creating marker: $e');
-    }
-  }
-
-  void _onStyleLoadedCallback(mp.StyleLoadedEventData data) async {
-    if (_destinationProvider.destination != null) {
-      await _initializeRoute();
-      await _fitCameraToBounds(); // Ensure camera shows the entire route after it's loaded
-    }
-  }
-
   void _navigateToMyLocation() async {
     if (_currentPosition == null || mapboxMap == null) return;
 
     await mapboxMap?.flyTo(
       mp.CameraOptions(
         center: mp.Point(
-          coordinates: mp.Position(_currentPosition!.longitude, _currentPosition!.latitude),
+          coordinates: mp.Position(
+            _currentPosition!.longitude,
+            _currentPosition!.latitude,
+          ),
         ),
         zoom: 15.0,
         bearing: 0,
@@ -414,13 +128,16 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   void _onDoneButtonPressed() {
     //this section after pressing done will take user to find a closest driver
 
-
     final fareProvider = Provider.of<FareProvider>(context, listen: false);
     final estimatedFare = fareProvider.estimatedFare;
 
     ScaffoldMessenger.of(context).showSnackBar(
       //just for test (it goes back to the home page)
-        SnackBar(content: Text('your driver is near, estimated fare: \$${estimatedFare?.toStringAsFixed(2)}'))
+      SnackBar(
+        content: Text(
+          'your driver is near, estimated fare: \$${estimatedFare?.toStringAsFixed(2)}',
+        ),
+      ),
     );
 
     //for now just go back to the home page
@@ -433,9 +150,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
       body: Stack(
         children: [
           //map
-          _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : const Map(),
+          const Map(),
 
           //top address bar
           Positioned(
@@ -444,7 +159,12 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
             right: 0,
             child: Container(
               color: Colors.black.withOpacity(0.7),
-              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top, left: 16, right: 16, bottom: 16),
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top,
+                left: 16,
+                right: 16,
+                bottom: 16,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -480,7 +200,11 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.my_location, color: Colors.blue, size: 20),
+                            Icon(
+                              Icons.my_location,
+                              color: Colors.blue,
+                              size: 20,
+                            ),
                             SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -502,7 +226,11 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
                         SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.location_on, color: Colors.red, size: 20),
+                            Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 20,
+                            ),
                             SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -553,7 +281,7 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white
+                  color: Colors.white,
                 ),
               ),
             ),
