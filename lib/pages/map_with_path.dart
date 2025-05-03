@@ -15,6 +15,7 @@ import 'package:wassilni/providers/fare_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:url_launcher/url_launcher.dart'; // Add this import
+import 'package:turf/turf.dart' as turf; // Add this import
 
 class MapWithPath extends StatefulWidget {
   final Ride ride;
@@ -37,6 +38,9 @@ class _MapWithPathState extends State<MapWithPath> {
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
 
+  bool isRideStarted = false; // Track if the ride has started
+  bool isWaitingForYahya = false; // Track if the "Waiting for Yahya" sheet is shown
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -52,6 +56,7 @@ class _MapWithPathState extends State<MapWithPath> {
 
   @override
   void dispose() {
+    print("Disposing resources...");
     userPositionStream?.cancel();
     super.dispose();
   }
@@ -289,58 +294,354 @@ class _MapWithPathState extends State<MapWithPath> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ride Details'),
-        backgroundColor: Colors.black,
-      ),
-      body: Stack(
-        children: [
-          // Fullscreen Map
-          _initialCameraOptions == null
-              ? const Center(child: CircularProgressIndicator())
-              : mp.MapWidget(
-                  onMapCreated: _onMapCreated,
-                  styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-                  onStyleLoadedListener: (event) => _onStyleLoadedCallback(event),
-                  cameraOptions: _initialCameraOptions,
+    bool isOnline = false; // Track online/offline state
+    bool isAccepted = false; // Track if the ride is accepted
+    bool isWaitingForYahya = false; // Track if the "Waiting for Yahya" sheet is shown
+    bool isRideStarted = false; // Track if the ride has started
+    bool isRideCompleted = false; // Track if the ride is completed
+    String buttonText = "Go!"; // Track button text
+
+    return StatefulBuilder(
+      builder: (context, setState) {
+        return Scaffold(
+          body: Stack(
+            children: [
+              // Fullscreen Map
+              _initialCameraOptions == null
+                  ? const Center(child: CircularProgressIndicator())
+                  : mp.MapWidget(
+                      onMapCreated: _onMapCreated,
+                      styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+                      onStyleLoadedListener: (event) => _onStyleLoadedCallback(event),
+                      cameraOptions: _initialCameraOptions,
+                    ),
+              // Floating Action Button (Go! / Stop! Button)
+              if (!isAccepted)
+                Positioned(
+                  bottom: 80,
+                  left: MediaQuery.of(context).size.width * 0.125, // Center horizontally (12.5% padding on each side)
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.75, // 75% of screen width
+                    child: FloatingActionButton.extended(
+                      onPressed: () {
+                        setState(() {
+                          // Toggle button text and online/offline state
+                          if (buttonText == "Go!") {
+                            buttonText = "Stop!";
+                            isOnline = true;
+                          } else {
+                            buttonText = "Go!";
+                            isOnline = false;
+                          }
+                        });
+                      },
+                      backgroundColor: buttonText == "Go!" ? Colors.blue : Colors.red,
+                      label: Text(
+                        buttonText,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
                 ),
-          // Header with pickup and dropoff
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: PickupDropoffHeader(
-              pickupLocation: '(${widget.ride.pickupLatitude}, ${widget.ride.pickupLongitude})',
-              dropoffLocation: '(${widget.ride.dropoffLatitude}, ${widget.ride.dropoffLongitude})',
-            ),
-          ),
-          // Buttons at the bottom
-          Positioned(
-            bottom: 16,
-            left: 16,
-            right: 16,
-            child: Column(
-              children: [
-                DoneButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => WaitingForPayment(ride: widget.ride),
+              // Draggable Bottom Sheet (Online Details)
+              if (isOnline && !isAccepted)
+                DraggableScrollableSheet(
+                  initialChildSize: 0.07, // Initial height of the bottom sheet
+                  minChildSize: 0.07, // Minimum height when collapsed
+                  maxChildSize: 0.4, // Maximum height when expanded
+                  builder: (context, scrollController) {
+                    // Static values for demonstration
+                    const double staticFare = 10.00; // Static fare value
+                    const String pickupDistance = "6 min (3.1 KM)"; // Static pickup distance
+                    const String dropoffDistance = "3 min (1.0 KM)"; // Static dropoff distance
+                    const String pickupLocation = "Tulkarm"; // Static pickup location
+                    const String dropoffLocation = "Nablus"; // Static dropoff location
+
+                    return Container(
+                      color: Colors.black,
+                      padding: const EdgeInsets.all(0), // Reduced padding
+                      child: ListView(
+                        controller: scrollController,
+                        children: [
+                          // Online Status
+                          Center(
+                            child: Text(
+                              "You are online now",
+                              style: const TextStyle(
+                                color: Colors.green,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Centered Fare
+                          Center(
+                            child: Text(
+                              "$staticFare\$",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Pickup Distance
+                          Row(
+                            children: [
+                              const Icon(Icons.circle, color: Colors.white, size: 12),
+                              const SizedBox(width: 8),
+                              Text(
+                                pickupDistance,
+                                style: const TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            pickupLocation,
+                            style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                          // Dropoff Distance
+                          Row(
+                            children: [
+                              const Icon(Icons.square, color: Colors.white, size: 12),
+                              const SizedBox(width: 8),
+                              Text(
+                                dropoffDistance,
+                                style: const TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            dropoffLocation,
+                            style: const TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                          const SizedBox(height: 16),
+                          // Accept Button
+                          Center(
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width * 0.75, // 75% of screen width
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    isAccepted = true; // Hide the bottom sheet and button
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green, // Changed to green
+                                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                                ),
+                                child: const Text(
+                                  "Accept!",
+                                  style: TextStyle(color: Colors.white, fontSize: 16),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     );
                   },
                 ),
-                const SizedBox(height: 8), // Add spacing between buttons
-                CallButton(
-                  phoneNumber: widget.ride.phoneNumber,
+              // Bottom Bar (You're Offline)
+              if (!isOnline && !isAccepted)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    color: Colors.black,
+                    padding: const EdgeInsets.all(16.0),
+                    child: Center(
+                      child: Text(
+                        "You're Offline",
+                        style: const TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ),
                 ),
-              ],
-            ),
+              // Bottom Bar (Picking up Yahya)
+              if (isAccepted && !isWaitingForYahya)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        isWaitingForYahya = true; // Show the "Waiting for Yahya" sheet
+                      });
+                    },
+                    child: Container(
+                      color: Colors.black,
+                      padding: const EdgeInsets.all(16.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.phone, color: Colors.white),
+                              SizedBox(width: 8),
+                              Text(
+                                "Picking up Yahya",
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              // Waiting for Yahya Section
+              if (isWaitingForYahya)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    color: Colors.black,
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min, // Ensure it takes only the required height
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.phone, color: Colors.white),
+                                SizedBox(width: 8),
+                                Text(
+                                  "Waiting for Yahya",
+                                  style: TextStyle(color: Colors.white, fontSize: 16),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        // Start Ride Button
+                        Center(
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width * 0.75, // 75% of screen width
+                            child: ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  isWaitingForYahya = false; // Hide the "Waiting for Yahya" section
+                                  isRideStarted = true; // Start the ride
+                                });
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              ),
+                              child: const Text(
+                                "Start Ride",
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Cancel Ride Button
+                        Center(
+                          child: SizedBox(
+                            width: MediaQuery.of(context).size.width * 0.75, // 75% of screen width
+                            child: ElevatedButton(
+                              onPressed: () {
+                                print("Cancel Ride button pressed");
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                              ),
+                              child: const Text(
+                                "Cancel Ride",
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (isRideStarted)
+                DraggableScrollableSheet(
+                  initialChildSize: 0.1, // Initial height of the bottom sheet
+                  minChildSize: 0.1, // Minimum height when collapsed
+                  maxChildSize: 0.2, // Maximum height when expanded
+                  builder: (context, scrollController) {
+                    return Container(
+                      color: Colors.black,
+                      padding: const EdgeInsets.all(0),
+                      child: ListView(
+                        controller: scrollController,
+                        children: [
+                          // Dropping Off Yahya Info
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(Icons.person, color: Colors.white),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    "Dropping Off Yahya",
+                                    style: TextStyle(color: Colors.white, fontSize: 16),
+                                  ),
+                                ],
+                              ),
+                              const Text(
+                                "1 min | 0.2 KM",
+                                style: TextStyle(color: Colors.white, fontSize: 16),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          // Complete Ride Button
+                          ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                // Reset all state variables
+                                isRideStarted = false;
+                                isRideCompleted = false;
+                                isAccepted = false;
+                                isWaitingForYahya = false;
+                                isOnline = false;
+                                buttonText = "Go!";
+                              });
+
+                              // Reinitialize the map and other components
+                              _initializeCamera();
+                              _renderPoints();
+                              _renderRoute();
+
+                              print("Ride completed and page reinitialized!");
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(vertical: 16.0),
+                            ),
+                            child: const Text(
+                              "Complete Ride!",
+                              style: TextStyle(color: Colors.white, fontSize: 16),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
