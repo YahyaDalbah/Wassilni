@@ -20,8 +20,6 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _firstNameController = TextEditingController();
-  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String _selectedCountryCode = '+970';
@@ -30,8 +28,6 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void dispose() {
     _phoneController.dispose();
-    _firstNameController.dispose();
-    _lastNameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -72,8 +68,6 @@ class _RegisterPageState extends State<RegisterPage> {
                 MaterialPageRoute(
                   builder: (context) => VerifyPhonePage(
                     verificationId: verificationId,
-                    firstName: _firstNameController.text.trim(),
-                    lastName: _lastNameController.text.trim(),
                     phoneNumber: phoneNumber,
                     password: _passwordController.text,
                   ),

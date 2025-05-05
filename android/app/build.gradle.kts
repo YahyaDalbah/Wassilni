@@ -45,3 +45,22 @@ android {
 flutter {
     source = "../.."
 }
+
+// Firebase Google Services plugin
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.google.gms:google-services:4.3.15")  // Ensure this line is included
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}

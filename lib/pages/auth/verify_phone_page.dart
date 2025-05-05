@@ -6,16 +6,12 @@ import 'package:wassilni/pages/auth/login_page.dart';
 
 class VerifyPhonePage extends StatefulWidget {
   final String verificationId;
-  final String firstName;
-  final String lastName;
   final String phoneNumber;
   final String password;
 
   const VerifyPhonePage({
     super.key,
     required this.verificationId,
-    required this.firstName,
-    required this.lastName,
     required this.phoneNumber,
     required this.password,
   });
@@ -77,8 +73,6 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
           .collection('users')
           .doc(userCredential.user!.uid)
           .set({
-        'firstName': widget.firstName,
-        'lastName': widget.lastName,
         'phoneNumber': widget.phoneNumber,
         'password': widget.password,
         'createdAt': FieldValue.serverTimestamp(),
