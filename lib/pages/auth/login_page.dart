@@ -90,6 +90,7 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildLoginForm() {
     return Form(
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       key: formState,
       child: Column(
         children: [
@@ -161,7 +162,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
       onPressed: () {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => Registerpage()),
+          MaterialPageRoute(builder: (context) => RegisterPage()),
         );
       },
       child: Text(

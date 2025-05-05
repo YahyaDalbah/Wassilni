@@ -1,141 +1,223 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
 import 'package:wassilni/pages/Component/input_field.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
-import 'package:wassilni/pages/auth/verify_email_page.dart';
+import 'package:wassilni/pages/auth/verify_phone_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-class Registerpage extends StatefulWidget {
-  const Registerpage({super.key});
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  State<Registerpage> createState() => _RegisterpageState();
+  State<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _RegisterpageState extends State<Registerpage> {
+class _RegisterPageState extends State<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  String _selectedCountryCode = '+970';
+  String _selectedCountryFlag = '🇵🇸';
 
- Future<void> _sendCodeToEmail(String email) async {
-    setState(() {
-      _isLoading = true; 
-    });
-    
-    try {
-      final existingUser = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .get();
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
-      if (existingUser.docs.isNotEmpty) {
+  Future<void> _registerWithPhoneNumber() async {
+    if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final phoneNumber = _selectedCountryCode + _phoneController.text.trim();
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: phoneNumber,
+          verificationCompleted: (PhoneAuthCredential credential) async {
+            await FirebaseAuth.instance.signInWithCredential(credential);
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error in verifying: ${e.message}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Code sent successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => VerifyPhonePage(
+                    verificationId: verificationId,
+                    firstName: _firstNameController.text.trim(),
+                    lastName: _lastNameController.text.trim(),
+                    phoneNumber: phoneNumber,
+                    password: _passwordController.text,
+                  ),
+                ),
+              );
+            }
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {},
+        );
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('This email is used try enter other email'),
+            SnackBar(
+              content: Text('Error : ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
         }
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
-      final random = Random();
-      final code = (random.nextInt(9000) + 1000).toString();
-
-      await FirebaseFirestore.instance.collection('users').doc(email).set({
-        'code': code,
-      });
-
-      _sendCode(email, code);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error occurs : ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
 
-  void _sendCode(String email, String code) async {
-    String username = "s12220672@stu.najah.edu";
-    String password = "tvcg rwln jspb xxyd";
-    final smtpServer = gmail(username, password);
-    final message =
-        Message()
-          ..from = Address('Wasilni@gmail.com', 'Wasilni')
-          ..recipients.add(email)
-          ..subject = "Email Verification Code"
-          ..text =
-              "To verify your email in Wasilni app you should enter this code in Verification page"
-              "The code is : $code";
-    try {
-      await send(message, smtpServer);
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (context) => VerifyEmailPage(
-                email: email,
-                password: _passwordController.text.trim(),
-              ),
+   _buildAppBar() {
+    return AppBar(
+      title: Text(
+        "Register Page",
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      ),
+      backgroundColor: Colors.black,
+      centerTitle: true,
+      elevation: 2,
+      shadowColor: Colors.white30,
+    );
+  }
+
+  Widget _buildPhoneNumberField() {
+    return Row(
+      children: [
+        Text(
+          _selectedCountryFlag,
+          style: TextStyle(fontSize: 24),
         ),
-      );
-    } catch (e) {
-  
-      debugPrint("Email send failed: $e");
-      
-      if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to send verification email"),backgroundColor: Colors.red,),
-      );
-    }
+        IconButton(
+          onPressed: () {
+            showCountryPicker(
+              context: context,
+              showPhoneCode: true,
+              onSelect: (Country country) {
+                setState(() {
+                  _selectedCountryCode = '+${country.phoneCode}';
+                  _selectedCountryFlag = country.flagEmoji;
+                });
+              },
+            );
+          },
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+        Expanded(
+          child: InputField(
+            controller: _phoneController,
+            validate: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your phone number';
+              }
+              if(value.length < 8 || value.length > 10){
+                return "The number must be between 8 - 10 digits";
+              }
+              return null;
+            },
+            text: "Phone Number ",
+            prefixText: _selectedCountryCode,
+            keyboardType: TextInputType.phone,
+          ),
+        ),
+      ],
+    );
   }
 
-  void _register() {
-    if (_formKey.currentState?.validate() ?? false) {
-      final email = _emailController.text.trim();
-      _sendCodeToEmail(email);
-    }
+  Widget _buildFormFields() {
+    return Column(
+      children: [
+        _buildPhoneNumberField(),
+        SizedBox(height: 20),
+        InputField(
+          controller: _passwordController,
+          validate: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter password';
+            }
+            if (value.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+            return null;
+          },
+          text: "Password ",
+          obscureText: true,
+        ),
+      ],
+    );
   }
 
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    super.dispose();
+  Widget _buildConfirmButton() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _registerWithPhoneNumber,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.black,
+          foregroundColor: Colors.white,
+          minimumSize: Size(300, 50),
+          textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+        child: _isLoading 
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 2,
+              ),
+            )
+          : Text("Confirm"),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white10,
-      appBar: AppBar(
-        title: Text(
-          "Register Page",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.black,
-        centerTitle: true,
-        elevation: 2,
-        shadowColor: Colors.white30,
-      ),
+      appBar: _buildAppBar(),
       body: SafeArea(
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 20),
@@ -148,10 +230,10 @@ class _RegisterpageState extends State<Registerpage> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        SizedBox(height: 100),
+                        SizedBox(height: 50),
                         Center(
                           child: Text(
-                            "Enter Your Email and Password",
+                            "Register with your phone number",
                             style: TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -160,43 +242,19 @@ class _RegisterpageState extends State<Registerpage> {
                           ),
                         ),
                         SizedBox(height: 30),
-                        InputField(
-                          controller: _emailController,
-                          validate: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
-                              return 'Please enter a valid email';
-                            }
-                            return null;
-                          },
-                          text: "Email ",
-                        ),
-                        InputField(
-                          controller: _passwordController,
-                          text: "Password ",
-                          validate: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                          obscureText: true,
-                        ),
+                        _buildFormFields(),
                         SizedBox(height: 20),
                         TextButton(
                           style: TextButton.styleFrom(
                             textStyle: TextStyle(decoration: TextDecoration.underline),
                           ),
                           onPressed: () {
-                            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context)=>LoginPage()));
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(builder: (context) => LoginPage())
+                            );
                           },
                           child: Text(
-                            "Don you have account?",
+                            "Do you have account?",
                             style: TextStyle(decoration: TextDecoration.underline),
                           ),
                         ),
@@ -204,31 +262,7 @@ class _RegisterpageState extends State<Registerpage> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.symmetric(vertical: 20),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _register,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      minimumSize: Size(300, 50),
-                      textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: _isLoading 
-                      ? SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text("Confirm"),
-                  ),
-                ),
+                _buildConfirmButton(),
               ],
             ),
           ),
