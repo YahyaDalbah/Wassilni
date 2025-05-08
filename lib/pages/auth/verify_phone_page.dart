@@ -3,6 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
+
+import 'package:wassilni/pages/home_page.dart';
+import 'package:wassilni/models/user_model.dart';
 
 class VerifyPhonePage extends StatefulWidget {
   final String verificationId;
@@ -50,10 +55,19 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
     }
   }
 
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password); 
+    final hash = sha256.convert(bytes); 
+    return hash.toString();
+  }
+
   void _checkValidateOfCode() async {
     if (_controllers.any((controller) => controller.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Pleas enter full code'), backgroundColor: Colors.red,),
+        const SnackBar(
+          content: Text('Please enter the complete verification code'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -69,29 +83,39 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
       );
 
       final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-        'phoneNumber': widget.phoneNumber,
-        'password': widget.password,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+      await UserModel.addToFireStore(
+        type: UserType.rider,
+        phone: widget.phoneNumber,
+        password: _hashPassword(widget.password), // Add hashed password
+        isOnline: true,
+        vehicle: {
+          "make": "",
+          "model": "",
+          "licensePlate": ""
+        },
+        location: const GeoPoint(0, 0),
+      );
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Verified successfully'), backgroundColor: Colors.green,),
+          const SnackBar(
+            content: Text('Phone number verified successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const LoginPage()),
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed verify : ${e.toString()}'), backgroundColor: Colors.red,),
+          SnackBar(
+            content: Text('Verification failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -109,7 +133,7 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
       backgroundColor: Colors.white10,
       appBar: AppBar(
         title: const Text(
-          "Verify Phone",
+          "Phone Verification",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.black,

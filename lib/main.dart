@@ -9,12 +9,14 @@ import 'package:wassilni/pages/map.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/home_page.dart';
+import 'package:wassilni/providers/user_provider.dart';
 
 void main() async {
   await setup();
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_)=> UserProvider(),),
         ChangeNotifierProvider(create: (_) => FareProvider()),
         ChangeNotifierProvider(create: (_) => DestinationProvider()),
       ],

@@ -1,10 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/home_page.dart';
-import 'package:wassilni/pages/map.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:wassilni/providers/user_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,44 +20,79 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
+  int _loginAttempts = 0;
+  DateTime? _lastFailedLogin;
+
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final hash = sha256.convert(bytes);
+    return hash.toString();
+  }
 
   Future<void> _loginWithPhone(String phoneNumber, String password) async {
+    if (_lastFailedLogin != null) {
+      final difference = DateTime.now().difference(_lastFailedLogin!);
+      if (difference.inMinutes < 1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Too many attempts. Please try again in ${60 - difference.inSeconds} seconds',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      } else {
+        _loginAttempts = 0;
+        _lastFailedLogin = null;
+      }
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final querySnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('phoneNumber', isEqualTo: phoneNumber)
-          .get();
+      final querySnapshot =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .where('phone', isEqualTo: phoneNumber)
+              .get();
 
       if (querySnapshot.docs.isEmpty) {
+        _handleFailedLogin();
         throw Exception("Phone number not found");
       }
 
       final userData = querySnapshot.docs.first.data();
-      final email = userData['email'];
+      final storedPassword = userData['password'];
+      final hashedInputPassword = _hashPassword(password);
 
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      if (storedPassword != hashedInputPassword) {
+        _handleFailedLogin();
+        throw Exception("Phone number or password is incorrect");
+      }
+
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+      _loginAttempts = 0;
+      _lastFailedLogin = null;
+
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomePage()),
+        await userProvider.login(phoneNumber, password);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
         );
       }
-      rethrow;
     } finally {
       if (mounted) {
         setState(() {
@@ -65,12 +102,21 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _handleFailedLogin() {
+    _loginAttempts++;
+    if (_loginAttempts >= 5) {
+      _lastFailedLogin = DateTime.now();
+      throw Exception("Too many failed attempts. Please try again in 1 minute");
+    }
+  }
+
   @override
   void dispose() {
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
+
   Widget _buildHeader() {
     return Column(
       children: [
@@ -174,20 +220,26 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _buildLoginButton() {
     return ElevatedButton(
-      onPressed: _isLoading ? null : () async {
-        if (formState.currentState!.validate()) {
-          try {
-            await _loginWithPhone(_phoneController.text, _passwordController.text);
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        }
-      },
+      onPressed:
+          _isLoading
+              ? null
+              : () async {
+                if (formState.currentState!.validate()) {
+                  try {
+                    await _loginWithPhone(
+                      _phoneController.text,
+                      _passwordController.text,
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e.toString()),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
       style: ElevatedButton.styleFrom(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
@@ -195,16 +247,17 @@ class _LoginPageState extends State<LoginPage> {
         textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
-      child: _isLoading
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
-            )
-          : Text("Login"),
+      child:
+          _isLoading
+              ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+              : Text("Login"),
     );
   }
 

@@ -1,10 +1,8 @@
 import 'dart:math';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:mailer/mailer.dart';
-import 'package:mailer/smtp_server.dart';
+import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/pages/Component/input_field.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/pages/auth/verify_phone_page.dart';
@@ -24,6 +22,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isLoading = false;
   String _selectedCountryCode = '+970';
   String _selectedCountryFlag = '🇵🇸';
+  DateTime? _lastSmsTime;
 
   @override
   void dispose() {
@@ -32,66 +31,93 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  Future<void> _registerWithPhoneNumber() async {
-    if (_formKey.currentState?.validate() ?? false) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final phoneNumber = _selectedCountryCode + _phoneController.text.trim();
-        await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: phoneNumber,
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            await FirebaseAuth.instance.signInWithCredential(credential);
-          },
-          verificationFailed: (FirebaseAuthException e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Error in verifying: ${e.message}'),
-                  backgroundColor: Colors.red,
-                ),
-              );
-            }
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Code sent successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => VerifyPhonePage(
-                    verificationId: verificationId,
-                    phoneNumber: phoneNumber,
-                    password: _passwordController.text,
-                  ),
-                ),
-              );
-            }
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {},
-        );
-      } catch (e) {
+  Future<void> _handleSmsTimeout(String phoneNumber) async {
+    if (_lastSmsTime != null) {
+      final difference = DateTime.now().difference(_lastSmsTime!);
+      if (difference.inSeconds < 60) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error : ${e.toString()}'),
-              backgroundColor: Colors.red,
+              content: Text('Please wait ${60 - difference.inSeconds} seconds before trying again'),
+              backgroundColor: Colors.orange,
             ),
           );
         }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        return;
+      }
+    }
+  }
+
+  void _handleVerificationFailed(FirebaseAuthException e) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Verification failed: ${e.message}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _handleCodeSent(String verificationId, String phoneNumber) {
+    _lastSmsTime = DateTime.now();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification code sent successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => VerifyPhonePage(
+            verificationId: verificationId,
+            phoneNumber: phoneNumber,
+            password: _passwordController.text,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleVerificationCompleted(PhoneAuthCredential credential, String phoneNumber) async {
+    await _addUserToFirestore(phoneNumber, _passwordController.text);
+    await FirebaseAuth.instance.signInWithCredential(credential);
+  }
+
+  Future<void> _registerWithPhoneNumber() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final phoneNumber = _selectedCountryCode + _phoneController.text.trim();
+    await _handleSmsTimeout(phoneNumber);
+    
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (credential) => _handleVerificationCompleted(credential, phoneNumber),
+        verificationFailed: _handleVerificationFailed,
+        codeSent: (verificationId, resendToken) => _handleCodeSent(verificationId, phoneNumber),
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
@@ -262,6 +288,24 @@ class _RegisterPageState extends State<RegisterPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+Future<void> _addUserToFirestore(String phoneNumber,String password) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    await UserModel.addToFireStore(
+      type: UserType.rider,
+      password: password ,
+      phone: phoneNumber,
+      isOnline: true,
+      vehicle: {
+        "make": "",
+        "model": "",
+        "licensePlate": ""
+      },
+      location: const GeoPoint(0, 0),
     );
   }
 }
