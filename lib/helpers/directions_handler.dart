@@ -37,9 +37,6 @@ Future<Map<String,dynamic>> getDirectionsRoute(
       '?geometries=geojson&access_token=$accessToken';
 
   final response = await http.get(Uri.parse(url));
-  print("###################################################");
-  print("'${origin.coordinates.lng},${origin.coordinates.lat};'${destination.coordinates.lng},${destination.coordinates.lat}'");
-  print("###################################################");
   if (response.statusCode == 200) {
     final data = json.decode(response.body);
 

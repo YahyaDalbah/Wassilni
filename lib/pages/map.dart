@@ -2,14 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
+import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/providers/user_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -58,22 +61,6 @@ class _Map extends State<Map> {
     if (mapboxMap == null || _destinationProvider.destination == null) return;
 
     final destination = _destinationProvider.destination!;
-
-    //a list of coordinates to fit in the camera view
-    final List<mp.Point> points = [
-      mp.Point(
-        coordinates: mp.Position(
-          currentPosition.longitude,
-          currentPosition.latitude,
-        ),
-      ),
-      mp.Point(
-        coordinates: mp.Position(
-          destination.coordinates.lng.toDouble(),
-          destination.coordinates.lat.toDouble(),
-        ),
-      ),
-    ];
 
     //calculated the southwest and northeast points for the bounds
     final double minLon = [
@@ -222,6 +209,10 @@ class _Map extends State<Map> {
       distanceFilter: 100,
     );
 
+    UserModel user = Provider.of<UserProvider>(context,listen: false).currentUser!;
+    if(Provider.of<UserProvider>(context,listen: false).currentUser == null ){
+      throw Exception("user is not set");
+    }
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
@@ -250,6 +241,12 @@ class _Map extends State<Map> {
             ),
           ],
         );
+        //driver update
+        await FirebaseFirestore.instance.collection('users')
+        .doc(user.id)
+        .update({
+          'location': GeoPoint(position.latitude, position.longitude),
+        });
       }
     });
   }
