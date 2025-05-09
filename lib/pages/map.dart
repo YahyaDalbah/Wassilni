@@ -23,9 +23,10 @@ class Map extends StatefulWidget {
 class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
-
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
+  late UserModel user;
+        
 
   @override
   void didChangeDependencies() {
@@ -36,6 +37,10 @@ class _Map extends State<Map> {
   @override
   void initState() {
     super.initState();
+    user = Provider.of<UserProvider>(context, listen: false).currentUser!;
+    if (Provider.of<UserProvider>(context, listen: false).currentUser == null) {
+      throw Exception("user is not set");
+    }
     _initializeCamera();
     _setupPositionTracking();
   }
@@ -121,13 +126,23 @@ class _Map extends State<Map> {
       ),
     );
 
+    
+
     var routeData = await getDirectionsRoute(origin, destination);
     var featureCollection = routeData["featureCollection"];
     var estimatedFare = routeData["estimatedFare"];
+    var distance = routeData["estimatedDistance"];
+    var duration = routeData["estimatedDuration"];
+
     if (context.mounted) {
       Provider.of<FareProvider>(context, listen: false).estimatedFare =
           estimatedFare;
+      Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+          distance;
+      Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+          duration;
     }
+
     await mapboxMap?.style.addSource(
       mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
     );
@@ -142,6 +157,10 @@ class _Map extends State<Map> {
         lineWidth: 6.0,
       ),
     );
+    //driver update
+    await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+      'location': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+    });
 
     createMarker(destination);
   }
@@ -208,11 +227,7 @@ class _Map extends State<Map> {
       accuracy: gl.LocationAccuracy.high,
       distanceFilter: 100,
     );
-
-    UserModel user = Provider.of<UserProvider>(context,listen: false).currentUser!;
-    if(Provider.of<UserProvider>(context,listen: false).currentUser == null ){
-      throw Exception("user is not set");
-    }
+    
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
@@ -224,6 +239,12 @@ class _Map extends State<Map> {
         var destination = _destinationProvider.destination!;
 
         var routeData = await getDirectionsRoute(origin, destination);
+        var distance = routeData["estimatedDistance"];
+        var duration = routeData["estimatedDuration"];
+        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+            distance;
+        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+            duration;
         var featureCollection = routeData["featureCollection"];
         var features = featureCollection['features'] as List;
         var rawCods = features[0]["geometry"]["coordinates"] as List;
@@ -242,11 +263,12 @@ class _Map extends State<Map> {
           ],
         );
         //driver update
-        await FirebaseFirestore.instance.collection('users')
-        .doc(user.id)
-        .update({
-          'location': GeoPoint(position.latitude, position.longitude),
-        });
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.id)
+            .update({
+              'location': GeoPoint(position.latitude, position.longitude),
+            });
       }
     });
   }
