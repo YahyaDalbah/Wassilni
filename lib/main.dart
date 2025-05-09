@@ -29,6 +29,7 @@ Future<void> setup() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await dotenv.load(fileName: ".env");
+  print(dotenv.env["MAPBOX_ACCESS_TOKEN"]!);
   MapboxOptions.setAccessToken(dotenv.env["MAPBOX_ACCESS_TOKEN"]!);
 }
 
