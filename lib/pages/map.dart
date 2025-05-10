@@ -13,6 +13,10 @@ import 'package:wassilni/providers/fare_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
+
+  // Add a global key to access the state of _Map
+  static final GlobalKey<_Map> mapKey = GlobalKey<_Map>();
+
   @override
   State<Map> createState() => _Map();
 }
@@ -23,11 +27,19 @@ class _Map extends State<Map> {
 
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
+  late mp.PointAnnotationManager? pickupDropoffAnnotationManager;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _destinationProvider = Provider.of<DestinationProvider>(context);
+
+    // Listen for changes in the provider
+    _destinationProvider.addListener(() {
+      if (_destinationProvider.pickup != null && _destinationProvider.dropoff != null) {
+        _initializeRoute();
+      }
+    });
   }
 
   @override
@@ -125,38 +137,102 @@ class _Map extends State<Map> {
   }
 
   Future<void> _initializeRoute() async {
-    var destination = _destinationProvider.destination!;
-    var currentPosition = await gl.Geolocator.getCurrentPosition();
-    var origin = mp.Point(
-      coordinates: mp.Position(
-        currentPosition.longitude,
-        currentPosition.latitude,
-      ),
-    );
-
-    var routeData = await getDirectionsRoute(origin, destination);
-    var featureCollection = routeData["featureCollection"];
-    var estimatedFare = routeData["estimatedFare"];
-    if (context.mounted) {
-      Provider.of<FareProvider>(context, listen: false).estimatedFare =
-          estimatedFare;
+    if (mapboxMap == null) {
+      print("❌ MapboxMap is null. Skipping route initialization.");
+      return;
     }
-    await mapboxMap?.style.addSource(
-      mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
-    );
 
-    await mapboxMap?.style.addLayer(
-      mp.LineLayer(
-        id: "route_layer",
-        sourceId: "route",
-        lineJoin: mp.LineJoin.ROUND,
-        lineCap: mp.LineCap.ROUND,
-        lineColor: Colors.purple.value,
-        lineWidth: 6.0,
-      ),
-    );
+    await clearRoute("pickup_to_dropoff_route");
+    await clearRoute("current_to_destination_route");
 
-    createMarker(destination);
+    final fareProvider = Provider.of<FareProvider>(context, listen: false);
+
+    if (_destinationProvider.pickup != null && _destinationProvider.dropoff != null) {
+      final pickup = _destinationProvider.pickup!;
+      final dropoff = _destinationProvider.dropoff!;
+
+      print("Drawing route from ${pickup.coordinates} to ${dropoff.coordinates}");
+
+      try {
+        var routeData = await getDirectionsRoute(pickup, dropoff);
+
+        // Safely extract values
+        final double fare = routeData["estimatedFare"] as double;
+        final double duration = routeData["duration"] as double;
+        final double distance = routeData["distance"] as double;
+
+        fareProvider.updateFareDetails(fare, duration, distance);
+
+        var featureCollection = routeData["featureCollection"];
+        await mapboxMap!.style.addSource(
+          mp.GeoJsonSource(id: "pickup_to_dropoff_route", data: json.encode(featureCollection)),
+        );
+
+        await mapboxMap!.style.addLayer(
+          mp.LineLayer(
+            id: "pickup_to_dropoff_route_layer",
+            sourceId: "pickup_to_dropoff_route",
+            lineJoin: mp.LineJoin.ROUND,
+            lineCap: mp.LineCap.ROUND,
+            lineColor: Colors.blue.value,
+            lineWidth: 6.0,
+          ),
+        );
+
+        print("✅ Updated pickup→dropoff route");
+      } catch (e) {
+        fareProvider.clearFareDetails();
+        print("🚨 Error drawing pickup→dropoff route: $e");
+      }
+      return;
+    }
+
+    // Fallback to current position→destination route
+    if (_destinationProvider.destination != null) {
+      var destination = _destinationProvider.destination!;
+      var currentPosition = await gl.Geolocator.getCurrentPosition();
+      var origin = mp.Point(
+        coordinates: mp.Position(
+          currentPosition.longitude,
+          currentPosition.latitude,
+        ),
+      );
+
+      print("Drawing route from current position to ${destination.coordinates}");
+
+      try {
+        var routeData = await getDirectionsRoute(origin, destination);
+
+        // Safely extract values
+        final double fare = routeData["estimatedFare"] as double;
+        final double duration = routeData["duration"] as double;
+        final double distance = routeData["distance"] as double;
+
+        fareProvider.updateFareDetails(fare, duration, distance);
+
+        var featureCollection = routeData["featureCollection"];
+        await mapboxMap!.style.addSource(
+          mp.GeoJsonSource(id: "current_to_destination_route", data: json.encode(featureCollection)),
+        );
+
+        await mapboxMap!.style.addLayer(
+          mp.LineLayer(
+            id: "current_to_destination_route_layer",
+            sourceId: "current_to_destination_route",
+            lineJoin: mp.LineJoin.ROUND,
+            lineCap: mp.LineCap.ROUND,
+            lineColor: Colors.purple.value,
+            lineWidth: 6.0,
+          ),
+        );
+
+        print("✅ Updated current→destination route");
+        createMarker(destination);
+      } catch (e) {
+        fareProvider.clearFareDetails();
+        print("🚨 Error drawing current→destination route: $e");
+      }
+    }
   }
 
   Future<void> _showDefaultView() async {
@@ -266,7 +342,105 @@ class _Map extends State<Map> {
     mp.PointAnnotationOptions pointAnnotationOptions =
         mp.PointAnnotationOptions(image: imageData, geometry: point);
 
+    // Create the marker and store the manager
     pointAnnotationManager?.create(pointAnnotationOptions);
+    
+  }
+
+mp.PointAnnotation? _pickupAnnotation;
+mp.PointAnnotation? _dropoffAnnotation;
+
+void createPickupDropoffMarker(mp.Point point, bool isPickup) async {
+  pickupDropoffAnnotationManager ??= await mapboxMap?.annotations.createPointAnnotationManager();
+  final Uint8List imageData = await loadMarkerImage();
+  
+  final annotation = await pickupDropoffAnnotationManager?.create(
+    mp.PointAnnotationOptions(
+      image: imageData,
+      geometry: point,
+      textField: "",
+      textOffset: [0, 0],
+    ),
+  );
+
+  if (annotation != null) {
+    if (isPickup) {
+      _pickupAnnotation = annotation;
+    } else {
+      _dropoffAnnotation = annotation;
+    }
+  }
+}
+
+void clearPickupMarker() {
+  if (_pickupAnnotation != null) {
+    pickupDropoffAnnotationManager?.delete(_pickupAnnotation!); // Single annotation, not a list
+    _pickupAnnotation = null;
+  }
+}
+
+void clearDropoffMarker() {
+  if (_dropoffAnnotation != null) {
+    pickupDropoffAnnotationManager?.delete(_dropoffAnnotation!); // Single annotation, not a list
+    _dropoffAnnotation = null;
+  }
+}
+
+void createPickupAndDropoffMarkers(mp.Point pickup, mp.Point dropoff) async {
+  // Clear existing markers and route
+  await clearPickupDropoffRouteAndMarkers();
+
+  // Create a new annotation manager instance
+  pickupDropoffAnnotationManager = await mapboxMap?.annotations.createPointAnnotationManager();
+
+  // Load marker image
+  final imageData = await loadMarkerImage();
+
+  // Create pickup marker
+  _pickupAnnotation = await pickupDropoffAnnotationManager?.create(
+    mp.PointAnnotationOptions(
+      image: imageData,
+      geometry: pickup,
+      textField: "Pickup", // Optional label for the marker
+      textOffset: [0, -2], // Adjust text position
+    ),
+  );
+
+  // Create dropoff marker
+  _dropoffAnnotation = await pickupDropoffAnnotationManager?.create(
+    mp.PointAnnotationOptions(
+      image: imageData,
+      geometry: dropoff,
+      textField: "Dropoff", // Optional label for the marker
+      textOffset: [0, -2], // Adjust text position
+    ),
+  );
+
+  print("Pickup and dropoff markers created successfully.");
+}
+
+  Future<void> clearRoute(String routeId) async {
+    if (mapboxMap == null) return;
+
+    final style = mapboxMap!.style;
+
+    // Remove the layer if it exists
+    if (await style.styleLayerExists("${routeId}_layer")) {
+      await style.removeStyleLayer("${routeId}_layer");
+      print("🗑️ Removed layer: ${routeId}_layer");
+    }
+
+    // Remove the source if it exists
+    if (await style.styleSourceExists(routeId)) {
+      await style.removeStyleSource(routeId);
+      print("🗑️ Removed source: $routeId");
+    }
+  }
+
+  Future<void> clearPickupDropoffRouteAndMarkers() async {
+    clearRoute("pickup_to_dropoff_route");
+    clearPickupMarker();
+    clearDropoffMarker();
   }
 
   @override

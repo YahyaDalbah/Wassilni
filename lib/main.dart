@@ -7,6 +7,7 @@ import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/auth/information_page.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
+import 'package:wassilni/pages/driver_map.dart';
 import 'package:wassilni/pages/map.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
@@ -37,6 +38,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(title: 'Flutter Demo', home: const Registerpage());
+    return MaterialApp(title: 'Flutter Demo', home: const DriverMap());
   }
 }
