@@ -1,32 +1,39 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:wassilni/pages/auth/information_page.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
+import 'package:crypto/crypto.dart';
+import 'dart:convert';
 
-class VerifyEmailPage extends StatefulWidget {
-  final String email;
+import 'package:wassilni/pages/home_page.dart';
+import 'package:wassilni/models/user_model.dart';
+
+class VerifyPhonePage extends StatefulWidget {
+  final String verificationId;
+  final String phoneNumber;
   final String password;
-  const VerifyEmailPage({
+
+  const VerifyPhonePage({
     super.key,
-    required this.email,
+    required this.verificationId,
+    required this.phoneNumber,
     required this.password,
   });
 
   @override
-  State<VerifyEmailPage> createState() => _VerifyEmailPageState();
+  State<VerifyPhonePage> createState() => _VerifyPhonePageState();
 }
 
-class _VerifyEmailPageState extends State<VerifyEmailPage> {
+class _VerifyPhonePageState extends State<VerifyPhonePage> {
   late List<FocusNode> _focusNodes;
   late List<TextEditingController> _controllers;
   bool _isLoading = false;
 
   @override
   void initState() {
-    _focusNodes = List.generate(4, (_) => FocusNode());
-    _controllers = List.generate(4, (_) => TextEditingController());
+    _focusNodes = List.generate(6, (_) => FocusNode());
+    _controllers = List.generate(6, (_) => TextEditingController());
     super.initState();
   }
 
@@ -48,10 +55,19 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     }
   }
 
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password); 
+    final hash = sha256.convert(bytes); 
+    return hash.toString();
+  }
+
   void _checkValidateOfCode() async {
     if (_controllers.any((controller) => controller.text.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the complete code'),backgroundColor: Colors.red,),
+        const SnackBar(
+          content: Text('Please enter the complete verification code'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -61,37 +77,45 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
 
     String enteredCode = _controllers.map((item) => item.text).join();
     try {
-      final codeFound =
-          await FirebaseFirestore.instance
-              .collection("users")
-              .doc(widget.email)
-              .get();
-      if (!codeFound.exists) {
-        throw Exception("Verification code not found");
-      }
-      final storeCode = codeFound.data()?['code'] as String;
-      if (enteredCode == storeCode) {
-        await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: widget.email,
-          password: widget.password,
+      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+        verificationId: widget.verificationId,
+        smsCode: enteredCode,
+      );
+
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      await UserModel.addToFireStore(
+        type: UserType.rider,
+        phone: widget.phoneNumber,
+        password: _hashPassword(widget.password), // Add hashed password
+        isOnline: true,
+        vehicle: {
+          "make": "",
+          "model": "",
+          "licensePlate": ""
+        },
+        location: const GeoPoint(0, 0),
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Phone number verified successfully'),
+            backgroundColor: Colors.green,
+          ),
         );
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Verified successfully!'),backgroundColor: Colors.green,),
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const InformationPage()),
-          );
-        }
-      } else {
-        throw Exception('Invalid verification code');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Verification failed: ${e.toString()}'),backgroundColor: Colors.red,),
+          SnackBar(
+            content: Text('Verification failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -109,7 +133,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       backgroundColor: Colors.white10,
       appBar: AppBar(
         title: const Text(
-          "Verify Email",
+          "Phone Verification",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.black,
@@ -124,7 +148,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
             children: [
               const SizedBox(height: 100),
               const Text(
-                "Enter the 4-digit code sent to your email",
+                "Enter the 6-digit code sent to your phone",
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -135,9 +159,9 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
               const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(4, (index) {
+                children: List.generate(6, (index) {
                   return Container(
-                    width: 50,
+                    width: 30,
                     margin: EdgeInsets.symmetric(horizontal: 8),
                     child: KeyboardListener(
                       focusNode: FocusNode(),

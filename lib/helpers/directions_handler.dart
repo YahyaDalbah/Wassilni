@@ -55,25 +55,23 @@ Future<Map<String, dynamic>> getDirectionsRoute(
     if (data['routes']?.isEmpty ?? true) throw Exception("No routes found");
     final route = data['routes'][0];
 
-    if (route['duration'] == null || route['distance'] == null) {
-      throw Exception("Missing duration/distance in route response");
-    }
+    var estimatedFare = estimateFare(route);
+    var distance = route['distance']; // in meters
+    var duration = route['duration']; // in seconds
 
     final geometry = route['geometry'];
 
-    final map = {
-      "estimatedFare": estimateFare(route),
-      "featureCollection": {
-        "type": "FeatureCollection",
-        "features": [{
-          "type": "Feature",
-          "id": "route_line",
-          "properties": {},
-          "geometry": geometry,
-        }],
-      },
-      "duration": (route['duration'] as num).toDouble() / 60,
-      "distance": (route['distance'] as num).toDouble() / 1000,
+
+    final featureCollection = {
+      "type": "FeatureCollection",
+      "features": [routeFeature],
+    };
+    Map<String,dynamic> map = {
+      "estimatedFare": estimatedFare,
+      "featureCollection": featureCollection,
+      "estimatedDistance": distance,
+      "estimatedDuration": duration
+
     };
 
     return map;

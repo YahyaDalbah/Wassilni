@@ -2,14 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
+import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
+import 'package:wassilni/providers/user_provider.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -24,10 +27,14 @@ class Map extends StatefulWidget {
 class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
-
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
+
   late mp.PointAnnotationManager? pickupDropoffAnnotationManager;
+
+  late UserModel user;
+        
+
 
   @override
   void didChangeDependencies() {
@@ -45,6 +52,10 @@ class _Map extends State<Map> {
   @override
   void initState() {
     super.initState();
+    user = Provider.of<UserProvider>(context, listen: false).currentUser!;
+    if (Provider.of<UserProvider>(context, listen: false).currentUser == null) {
+      throw Exception("user is not set");
+    }
     _initializeCamera();
     _setupPositionTracking();
   }
@@ -70,22 +81,6 @@ class _Map extends State<Map> {
     if (mapboxMap == null || _destinationProvider.destination == null) return;
 
     final destination = _destinationProvider.destination!;
-
-    //a list of coordinates to fit in the camera view
-    final List<mp.Point> points = [
-      mp.Point(
-        coordinates: mp.Position(
-          currentPosition.longitude,
-          currentPosition.latitude,
-        ),
-      ),
-      mp.Point(
-        coordinates: mp.Position(
-          destination.coordinates.lng.toDouble(),
-          destination.coordinates.lat.toDouble(),
-        ),
-      ),
-    ];
 
     //calculated the southwest and northeast points for the bounds
     final double minLon = [
@@ -179,13 +174,6 @@ class _Map extends State<Map> {
           ),
         );
 
-        print("✅ Updated pickup→dropoff route");
-      } catch (e) {
-        fareProvider.clearFareDetails();
-        print("🚨 Error drawing pickup→dropoff route: $e");
-      }
-      return;
-    }
 
     // Fallback to current position→destination route
     if (_destinationProvider.destination != null) {
@@ -197,6 +185,43 @@ class _Map extends State<Map> {
           currentPosition.latitude,
         ),
       );
+
+    
+
+    var routeData = await getDirectionsRoute(origin, destination);
+    var featureCollection = routeData["featureCollection"];
+    var estimatedFare = routeData["estimatedFare"];
+    var distance = routeData["estimatedDistance"];
+    var duration = routeData["estimatedDuration"];
+
+    if (context.mounted) {
+      Provider.of<FareProvider>(context, listen: false).estimatedFare =
+          estimatedFare;
+      Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+          distance;
+      Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+          duration;
+    }
+
+    await mapboxMap?.style.addSource(
+      mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
+    );
+
+    await mapboxMap?.style.addLayer(
+      mp.LineLayer(
+        id: "route_layer",
+        sourceId: "route",
+        lineJoin: mp.LineJoin.ROUND,
+        lineCap: mp.LineCap.ROUND,
+        lineColor: Colors.purple.value,
+        lineWidth: 6.0,
+      ),
+    );
+    //driver update
+    await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+      'location': GeoPoint(currentPosition.latitude, currentPosition.longitude),
+    });
+
 
       print("Drawing route from current position to ${destination.coordinates}");
 
@@ -297,7 +322,7 @@ class _Map extends State<Map> {
       accuracy: gl.LocationAccuracy.high,
       distanceFilter: 100,
     );
-
+    
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
@@ -309,6 +334,12 @@ class _Map extends State<Map> {
         var destination = _destinationProvider.destination!;
 
         var routeData = await getDirectionsRoute(origin, destination);
+        var distance = routeData["estimatedDistance"];
+        var duration = routeData["estimatedDuration"];
+        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+            distance;
+        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+            duration;
         var featureCollection = routeData["featureCollection"];
         var features = featureCollection['features'] as List;
         var rawCods = features[0]["geometry"]["coordinates"] as List;
@@ -326,6 +357,13 @@ class _Map extends State<Map> {
             ),
           ],
         );
+        //driver update
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.id)
+            .update({
+              'location': GeoPoint(position.latitude, position.longitude),
+            });
       }
     });
   }

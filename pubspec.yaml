@@ -44,6 +44,11 @@ dependencies:
   mailer: ^6.4.1
   sliding_up_panel: ^2.0.0
 
+  
+  crypto: ^3.0.3
+
+
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

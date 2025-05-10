@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:wassilni/pages/position_destination.dart';
 import 'package:wassilni/providers/destination_provider.dart';
+import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -95,17 +97,35 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // title
+            // title and logout button
             Positioned(
               top: 20,
               right: 20,
-              child: Text(
-                'Wassilni',
-                style: TextStyle(
-                  fontSize: 36,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                children: [
+                  Text(
+                    'Wassilni',
+                    style: TextStyle(
+                      fontSize: 36,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  IconButton(
+                    icon: Icon(Icons.logout, color: Colors.white),
+                    onPressed: () async {
+                      final userProvider = Provider.of<UserProvider>(context, listen: false);
+                      await userProvider.logout();
+                      if (mounted) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                        );
+                      }
+                    },
+                  ),
+                ],
               ),
             ),
 
