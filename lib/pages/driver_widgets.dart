@@ -54,9 +54,10 @@ Widget buildPanelContent({
 
 Widget buildWaitingPanel({
   required String userName,
-  required String estTimeLeft,
+  required String waitTime,
   required VoidCallback onStartRide,
-  required VoidCallback onCancelRide,
+  VoidCallback? onCancelRide, // Keep cancellation logic unchanged
+  required bool isCancelEnabled, // Pass enabled state
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -71,7 +72,7 @@ Widget buildWaitingPanel({
             style: const TextStyle(fontSize: 18, color: Colors.white),
           ),
           Text(
-            estTimeLeft,
+            waitTime,
             style: const TextStyle(fontSize: 18, color: Colors.white),
           ),
         ],
@@ -96,9 +97,11 @@ Widget buildWaitingPanel({
             ),
           ),
           ElevatedButton(
-            onPressed: onCancelRide,
+            onPressed: isCancelEnabled ? onCancelRide : null, // Disable button if not enabled
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.red, // Enabled color
+              disabledBackgroundColor: const Color(0xFFCF8383), // Disabled color
+              foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
