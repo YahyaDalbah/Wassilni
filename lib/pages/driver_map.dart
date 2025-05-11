@@ -9,6 +9,7 @@ import 'package:wassilni/pages/driver_widgets.dart'; // Import the new file
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:geolocator/geolocator.dart' as gl;
+import 'dart:async'; // Add this import for Timer
 
 // Static Ride object
 final Ride staticRide = Ride(
@@ -71,13 +72,53 @@ class _DriverMapState extends State<DriverMap> {
   String get distance => "${staticRide.distance} KM";
   String get estTimeLeft => "${staticRide.duration} min";
 
+  Timer? _distanceUpdateTimer;
+  Timer? _onlineDistanceTimer; // Timer for online state updates
+  int _remainingWaitTime = 7; // Countdown timer for waiting state
+  Timer? _waitTimer;
+
+  String _formatWaitTime() {
+    return "0:${_remainingWaitTime.toString().padLeft(2, '0')}"; // Format as "0:07"
+  }
+
+  bool get _isCancelEnabled => _remainingWaitTime == 0;
+
+  Future<void> _updateDroppingOffDistance() async {
+    try {
+      final currentPosition = await gl.Geolocator.getCurrentPosition();
+      final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
+
+      final currentToDropoff = gl.Geolocator.distanceBetween(
+        currentPosition.latitude,
+        currentPosition.longitude,
+        staticRide.destination.coordinates.latitude,
+        staticRide.destination.coordinates.longitude,
+      );
+
+      destinationProvider.updateCurrentToDropoffDistance(currentToDropoff / 1000); // Convert to kilometers
+      print("📍 Updated dropoff distance: ${currentToDropoff / 1000} KM");
+    } catch (e) {
+      print("🚨 Failed to update dropoff distance: $e");
+    }
+  }
+
+  void _startOnlineUpdates() {
+    _onlineDistanceTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (driverState == DriverState.online || driverState == DriverState.pickingUp) {
+        _calculateDistances(); // Recalculate distances every 5 seconds
+      }
+    });
+  }
+
   void toggleOnlineStatus() {
     setState(() {
       if (driverState == DriverState.offline) {
         driverState = DriverState.online;
-        _calculateDistances();
+        _calculateDistances(); // Initial calculation
+        _startOnlineUpdates(); // Start periodic updates
       } else if (driverState == DriverState.online) {
         driverState = DriverState.offline;
+        _onlineDistanceTimer?.cancel(); // Stop updates when going offline
       }
       print("Driver state: $driverState");
     });
@@ -85,6 +126,8 @@ class _DriverMapState extends State<DriverMap> {
 
   Future<void> _calculateDistances() async {
     try {
+      if (driverState != DriverState.online && driverState != DriverState.pickingUp) return;
+
       // Get the current location
       final currentPosition = await gl.Geolocator.getCurrentPosition();
       final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
@@ -95,26 +138,25 @@ class _DriverMapState extends State<DriverMap> {
         currentPosition.longitude,
         staticRide.pickup.coordinates.latitude,
         staticRide.pickup.coordinates.longitude,
-      );
+      ) / 1000; // Convert to kilometers
 
       final pickupToDropoff = gl.Geolocator.distanceBetween(
         staticRide.pickup.coordinates.latitude,
         staticRide.pickup.coordinates.longitude,
         staticRide.destination.coordinates.latitude,
         staticRide.destination.coordinates.longitude,
-      );
+      ) / 1000;
 
-      // Update distances in the provider
-      destinationProvider.updateDistances(
-        currentToPickup / 1000, // Convert to kilometers
-        pickupToDropoff / 1000, // Convert to kilometers
-      );
+      destinationProvider.updateDistances(currentToPickup, pickupToDropoff);
 
-      print("✅ Distances calculated: Current→Pickup: ${currentToPickup / 1000} KM, Pickup→Dropoff: ${pickupToDropoff / 1000} KM");
+      // Automatic transition to "waiting" state if within 15 meters of pickup
+      if (driverState == DriverState.pickingUp && currentToPickup <= 0.015 && mounted) {
+        transitionToWaiting();
+      }
+
+      print("✅ Distances calculated: Current→Pickup: ${currentToPickup.toStringAsFixed(3)} KM");
     } catch (e) {
       print("🚨 Distance calculation failed: $e");
-
-      // Optional: revert to offline state on failure
       if (mounted) setState(() => driverState = DriverState.offline);
     }
   }
@@ -181,6 +223,11 @@ class _DriverMapState extends State<DriverMap> {
       clearPickup();
     });
 
+    // Start periodic updates for the dropoff distance
+    _distanceUpdateTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _updateDroppingOffDistance();
+    });
+
     // Get the current location and draw the new route
     final currentPosition = await gl.Geolocator.getCurrentPosition();
     final currentLocationPoint = mp.Point(
@@ -226,6 +273,23 @@ class _DriverMapState extends State<DriverMap> {
     print("transitionToWaiting method triggered");
     setState(() {
       driverState = DriverState.waiting;
+      _remainingWaitTime = 7; // Reset timer
+      _waitTimer?.cancel(); // Cancel any existing timer
+
+      // Start countdown
+      _waitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
+
+        setState(() {
+          if (_remainingWaitTime > 0) {
+            _remainingWaitTime--;
+          } else {
+            timer.cancel(); // Stop timer at 0
+            if (mounted) setState(() {}); // Force rebuild to enable button
+          }
+        });
+      });
+
       print("Driver state updated to: $driverState");
     });
   }
@@ -246,6 +310,14 @@ class _DriverMapState extends State<DriverMap> {
 
     // Clear the route only
     clearSpecificRoute("pickup_to_dropoff_route");
+  }
+
+  @override
+  void dispose() {
+    _waitTimer?.cancel(); // Cancel waiting timer
+    _distanceUpdateTimer?.cancel();
+    _onlineDistanceTimer?.cancel(); // Cancel online timer
+    super.dispose();
   }
 
   @override
@@ -321,8 +393,47 @@ class _DriverMapState extends State<DriverMap> {
                   print("Footer tapped to transition to waiting");
                   transitionToWaiting();
                 },
-                child: FooterWidget(
-                  text: "Picking Up $userName",
+                child: Container(
+                  height: 100, // Increased height
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+                  color: Colors.black,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        "Picking Up $userName",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Consumer<DestinationProvider>(
+                        builder: (context, provider, _) {
+                          final distanceKm = provider.currentToPickupDistance;
+                          final String distanceText;
+
+                          if (distanceKm == null) {
+                            distanceText = '--';
+                          } else if (distanceKm <= 0.1) {
+                            // Convert to meters and round to nearest integer
+                            final distanceMeters = (distanceKm * 1000).round();
+                            distanceText = '$distanceMeters m';
+                          } else {
+                            distanceText = '${distanceKm.toStringAsFixed(1)} km';
+                          }
+
+                          return Text(
+                            "$distanceText to pickup",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -335,11 +446,14 @@ class _DriverMapState extends State<DriverMap> {
               color: Colors.black,
               panel: buildWaitingPanel(
                 userName: userName,
-                estTimeLeft: estTimeLeft,
+                waitTime: _formatWaitTime(),
                 onStartRide: startRide,
-                onCancelRide: resetToDefault,
+                onCancelRide: _isCancelEnabled ? resetToDefault : null, // Disable when timer running
+                isCancelEnabled: _isCancelEnabled, // Pass enabled state
               ),
-              collapsed: buildCollapsedPanel("Waiting For $userName"),
+              collapsed: buildCollapsedPanel(
+                "Waiting For $userName - ${_formatWaitTime()}" // Add timer to collapsed panel
+              ),
             ),
           // Sliding panel for "Dropping Off User"
           if (driverState == DriverState.droppingOff)
@@ -350,7 +464,7 @@ class _DriverMapState extends State<DriverMap> {
               color: Colors.black,
               panel: buildDroppingOffPanel(
                 userName: userName,
-                distance: distance,
+                distance: "${Provider.of<DestinationProvider>(context).currentToDropoffDistance?.toStringAsFixed(1) ?? staticRide.distance.toStringAsFixed(1)} KM", // Use dynamic distance
                 estTimeLeft: estTimeLeft,
                 onCompleteRide: resetToDefault,
               ),
