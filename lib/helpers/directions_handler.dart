@@ -8,9 +8,8 @@ double estimateFare(dynamic route) {
   final double ratePerKm = 1.50;
   final double ratePerMin = 0.20;
 
-  // Added null safety with default values
-  final distance = (route['distance'] as num?)?.toDouble() ?? 0.0; // in meters
-  final duration = (route['duration'] as num?)?.toDouble() ?? 0.0; // in seconds
+  final distance = route['distance']; // in meters
+  final duration = route['duration']; // in seconds
 
   // Convert units
   final distanceKm = distance / 1000;
@@ -20,47 +19,40 @@ double estimateFare(dynamic route) {
   final distanceCost = distanceKm * ratePerKm;
   final timeCost = durationMin * ratePerMin;
 
-  final rawFare = baseFare + distanceCost + timeCost;
-  return (rawFare * 2).roundToDouble() / 2;
+  var rawFare = baseFare + distanceCost + timeCost;
+  var roundedFare = (rawFare * 2).roundToDouble() / 2;
+  // Total fare calculation
+  return roundedFare;
 }
 
-Future<Map<String, dynamic>> getDirectionsRoute(
+Future<Map<String,dynamic>> getDirectionsRoute(
   Point origin,
   Point destination,
 ) async {
-  print("🌍🌍🌍 API CALL TRIGGERED 🌍🌍🌍"); // Add this first
   final String accessToken = dotenv.env["MAPBOX_ACCESS_TOKEN"]!;
-
-  // Add debug prints for token validation
-  print("🔑 Mapbox Token: ${accessToken.isNotEmpty ? 'VALID' : 'MISSING'}");
-
   final String url =
       'https://api.mapbox.com/directions/v5/mapbox/driving/'
       '${origin.coordinates.lng},${origin.coordinates.lat};'
       '${destination.coordinates.lng},${destination.coordinates.lat}'
-      '?geometries=geojson'
-      '&annotations=duration,distance'
-      '&access_token=$accessToken';
-
-  print("🔗 API URL: $url"); // Log the exact URL being called
+      '?geometries=geojson&access_token=$accessToken';
 
   final response = await http.get(Uri.parse(url));
-  print("🎯 API Status Code: ${response.statusCode}");
-
   if (response.statusCode == 200) {
-    print("✅ RAW API RESPONSE: ${response.body}"); // Critical for debugging
     final data = json.decode(response.body);
 
-    // Validation for required fields
-    if (data['routes']?.isEmpty ?? true) throw Exception("No routes found");
+    // Extract the route geometry from the response
     final route = data['routes'][0];
-
     var estimatedFare = estimateFare(route);
     var distance = route['distance']; // in meters
     var duration = route['duration']; // in seconds
-
     final geometry = route['geometry'];
-
+    // Create a GeoJSON feature from the route geometry
+    final routeFeature = {
+      "type": "Feature",
+      "id": "route_line",
+      "properties": {},
+      "geometry": geometry,
+    };
 
     final featureCollection = {
       "type": "FeatureCollection",
@@ -71,12 +63,9 @@ Future<Map<String, dynamic>> getDirectionsRoute(
       "featureCollection": featureCollection,
       "estimatedDistance": distance,
       "estimatedDuration": duration
-
     };
-
     return map;
   } else {
-    print("🚨 API ERROR: ${response.reasonPhrase}");
-    throw Exception("API request failed: ${response.statusCode}");
+    throw Exception("API not responding");
   }
 }
