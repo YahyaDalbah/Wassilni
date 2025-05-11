@@ -92,4 +92,13 @@ class DestinationProvider with ChangeNotifier {
     _pickupToDropoffDistance = null;
     notifyListeners();
   }
+
+  double? _currentToDropoffDistance;
+
+  double? get currentToDropoffDistance => _currentToDropoffDistance;
+
+  void updateCurrentToDropoffDistance(double distance) {
+    _currentToDropoffDistance = distance;
+    notifyListeners();
+  }
 }
