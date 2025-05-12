@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider extends ChangeNotifier {
   UserModel? _currentUser;
@@ -25,7 +26,8 @@ class UserProvider extends ChangeNotifier {
 }
 
   Future<void> logout() async {
-    await auth.FirebaseAuth.instance.signOut();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('logged_in_phone');
     _currentUser = null;
     notifyListeners();
   }
