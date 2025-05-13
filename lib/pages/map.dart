@@ -31,7 +31,6 @@ class _Map extends State<Map> {
   mp.CameraOptions? _initialCameraOptions;
   late UserModel user;
   mp.PointAnnotationManager? pointAnnotationManager;
-        
 
   @override
   void didChangeDependencies() {
@@ -59,15 +58,17 @@ class _Map extends State<Map> {
 
   void _startTrackingDriver() {
     // Replace with actual driver ID from your system
-    final driverId = "fDTec7f3vAZL5y0TqJZn"; 
-    final driverDoc = FirebaseFirestore.instance.collection('users').doc(driverId);
+    final driverId = "fDTec7f3vAZL5y0TqJZn";
+    final driverDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(driverId);
 
     _driverLocationSub = driverDoc.snapshots().listen((snapshot) async {
       if (!snapshot.exists) return;
-      
+
       final location = snapshot['location'] as GeoPoint;
       final point = mp.Point(
-        coordinates: mp.Position(location.longitude, location.latitude)
+        coordinates: mp.Position(location.longitude, location.latitude),
       );
       _destinationProvider.destination = point;
       var position = await gl.Geolocator.getCurrentPosition();
@@ -80,7 +81,8 @@ class _Map extends State<Map> {
     setState(() {
       mapboxMap = controller;
     });
-    pointAnnotationManager = await mapboxMap?.annotations.createPointAnnotationManager();
+    pointAnnotationManager =
+        await mapboxMap?.annotations.createPointAnnotationManager();
 
     mapboxMap?.location.updateSettings(
       mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
@@ -153,8 +155,6 @@ class _Map extends State<Map> {
         currentPosition.latitude,
       ),
     );
-
-    
 
     var routeData = await getDirectionsRoute(origin, destination);
     var featureCollection = routeData["featureCollection"];
@@ -255,13 +255,12 @@ class _Map extends State<Map> {
       accuracy: gl.LocationAccuracy.high,
       distanceFilter: 100,
     );
-    
+
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
     ).listen((gl.Position position) async {
       if (mapboxMap != null && _destinationProvider.destination != null) {
-        
         _updatePositionAndRoute(position);
 
         //driver update
@@ -274,36 +273,37 @@ class _Map extends State<Map> {
       }
     });
   }
-  void _updatePositionAndRoute(gl.Position position) async{
-        var origin = mp.Point(
-          coordinates: mp.Position(position.longitude, position.latitude),
-        );
-        var destination = _destinationProvider.destination!;
 
-        var routeData = await getDirectionsRoute(origin, destination);
-        var distance = routeData["estimatedDistance"];
-        var duration = routeData["estimatedDuration"];
-        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
-            distance;
-        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
-            duration;
-        var featureCollection = routeData["featureCollection"];
-        var features = featureCollection['features'] as List;
-        var rawCods = features[0]["geometry"]["coordinates"] as List;
-        var cods =
-            rawCods
-                .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
-                .toList();
-        await mapboxMap?.style.updateGeoJSONSourceFeatures(
-          "route",
-          "updated_route",
-          [
-            mp.Feature(
-              id: "route_line", //same feature id that we used to create the source
-              geometry: mp.LineString(coordinates: cods),
-            ),
-          ],
-        );
+  void _updatePositionAndRoute(gl.Position position) async {
+    var origin = mp.Point(
+      coordinates: mp.Position(position.longitude, position.latitude),
+    );
+    var destination = _destinationProvider.destination!;
+
+    var routeData = await getDirectionsRoute(origin, destination);
+    var distance = routeData["estimatedDistance"];
+    var duration = routeData["estimatedDuration"];
+    Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+        distance;
+    Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+        duration;
+    var featureCollection = routeData["featureCollection"];
+    var features = featureCollection['features'] as List;
+    var rawCods = features[0]["geometry"]["coordinates"] as List;
+    var cods =
+        rawCods
+            .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
+            .toList();
+    await mapboxMap?.style.updateGeoJSONSourceFeatures(
+      "route",
+      "updated_route",
+      [
+        mp.Feature(
+          id: "route_line", //same feature id that we used to create the source
+          geometry: mp.LineString(coordinates: cods),
+        ),
+      ],
+    );
   }
 
   Future<Uint8List> loadMarkerImage(String imageUrl) async {
@@ -316,10 +316,10 @@ class _Map extends State<Map> {
     mp.PointAnnotationOptions pointAnnotationOptions =
         mp.PointAnnotationOptions(image: imageData, geometry: point);
 
-    if(_marker != null){
+    if (_marker != null) {
       _marker!.geometry = point;
       pointAnnotationManager?.update(_marker!);
-    }else{
+    } else {
       _marker = await pointAnnotationManager?.create(pointAnnotationOptions);
     }
   }
