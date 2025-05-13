@@ -13,6 +13,8 @@ import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -23,9 +25,12 @@ class Map extends StatefulWidget {
 class _Map extends State<Map> {
   mp.MapboxMap? mapboxMap;
   StreamSubscription? userPositionStream;
+  StreamSubscription<DocumentSnapshot>? _driverLocationSub;
+  mp.PointAnnotation? _marker;
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
   late UserModel user;
+  mp.PointAnnotationManager? pointAnnotationManager;
         
 
   @override
@@ -43,6 +48,7 @@ class _Map extends State<Map> {
     }
     _initializeCamera();
     _setupPositionTracking();
+    _startTrackingDriver();
   }
 
   @override
@@ -51,10 +57,31 @@ class _Map extends State<Map> {
     super.dispose();
   }
 
+  void _startTrackingDriver() {
+    // Replace with actual driver ID from your system
+    final driverId = "fDTec7f3vAZL5y0TqJZn"; 
+    final driverDoc = FirebaseFirestore.instance.collection('users').doc(driverId);
+
+    _driverLocationSub = driverDoc.snapshots().listen((snapshot) async {
+      if (!snapshot.exists) return;
+      
+      final location = snapshot['location'] as GeoPoint;
+      final point = mp.Point(
+        coordinates: mp.Position(location.longitude, location.latitude)
+      );
+      _destinationProvider.destination = point;
+      var position = await gl.Geolocator.getCurrentPosition();
+      _updatePositionAndRoute(position);
+      createMarker(point);
+    });
+  }
+
   void _onMapCreated(mp.MapboxMap? controller) async {
     setState(() {
       mapboxMap = controller;
     });
+    pointAnnotationManager = await mapboxMap?.annotations.createPointAnnotationManager();
+
     mapboxMap?.location.updateSettings(
       mp.LocationComponentSettings(enabled: true, pulsingEnabled: true),
     );
@@ -117,6 +144,7 @@ class _Map extends State<Map> {
   }
 
   Future<void> _initializeRoute() async {
+    if (mapboxMap == null || _destinationProvider.destination == null) return;
     var destination = _destinationProvider.destination!;
     var currentPosition = await gl.Geolocator.getCurrentPosition();
     var origin = mp.Point(
@@ -233,6 +261,20 @@ class _Map extends State<Map> {
       locationSettings: locationSettings,
     ).listen((gl.Position position) async {
       if (mapboxMap != null && _destinationProvider.destination != null) {
+        
+        _updatePositionAndRoute(position);
+
+        //driver update
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.id)
+            .update({
+              'location': GeoPoint(position.latitude, position.longitude),
+            });
+      }
+    });
+  }
+  void _updatePositionAndRoute(gl.Position position) async{
         var origin = mp.Point(
           coordinates: mp.Position(position.longitude, position.latitude),
         );
@@ -262,30 +304,24 @@ class _Map extends State<Map> {
             ),
           ],
         );
-        //driver update
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.id)
-            .update({
-              'location': GeoPoint(position.latitude, position.longitude),
-            });
-      }
-    });
   }
 
-  Future<Uint8List> loadMarkerImage() async {
-    var byteData = await rootBundle.load("assets/location.png");
+  Future<Uint8List> loadMarkerImage(String imageUrl) async {
+    var byteData = await rootBundle.load(imageUrl);
     return byteData.buffer.asUint8List();
   }
 
   void createMarker(mp.Point point) async {
-    final pointAnnotationManager =
-        await mapboxMap?.annotations.createPointAnnotationManager();
-    final Uint8List imageData = await loadMarkerImage();
+    final Uint8List imageData = await loadMarkerImage("assets/location.png");
     mp.PointAnnotationOptions pointAnnotationOptions =
         mp.PointAnnotationOptions(image: imageData, geometry: point);
 
-    pointAnnotationManager?.create(pointAnnotationOptions);
+    if(_marker != null){
+      _marker!.geometry = point;
+      pointAnnotationManager?.update(_marker!);
+    }else{
+      _marker = await pointAnnotationManager?.create(pointAnnotationOptions);
+    }
   }
 
   @override
