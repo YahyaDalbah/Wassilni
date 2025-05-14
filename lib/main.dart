@@ -10,6 +10,7 @@ import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/home_page.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/providers/ride_provider.dart';
 
 void main() async {
   await setup();
@@ -19,6 +20,7 @@ void main() async {
         ChangeNotifierProvider(create: (_)=> UserProvider(),),
         ChangeNotifierProvider(create: (_) => FareProvider()),
         ChangeNotifierProvider(create: (_) => DestinationProvider()),
+        ChangeNotifierProvider(create: (_) => RideProvider()),
       ],
       child: const MyApp(),
     ),

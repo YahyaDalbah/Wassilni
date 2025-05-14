@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +16,10 @@ import 'package:wassilni/helpers/directions_handler.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/map.dart';
-
+import '../models/ride_model.dart';
+import '../providers/ride_provider.dart';
+import '../providers/user_provider.dart';
+import 'accept_driver.dart';
 class PositionDestinationPage extends StatefulWidget {
   const PositionDestinationPage({super.key});
 
@@ -31,6 +35,8 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
   gl.Position? _currentPosition;
   String _originAddress = 'Finding your location...';
   String _destinationAddress = 'Loading destination...';
+  GeoPoint? _pickupCoordinates; // e.g., from _currentPosition
+  GeoPoint? _destinationCoordinates; // From destination selection
 
   @override
   void didChangeDependencies() {
@@ -124,23 +130,36 @@ class _PositionDestinationPageState extends State<PositionDestinationPage> {
     );
   }
 
-  void _onDoneButtonPressed() {
-    //this section after pressing done will take user to find a closest driver
-
+  Future<void> _onDoneButtonPressed() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
     final fareProvider = Provider.of<FareProvider>(context, listen: false);
-    final estimatedFare = fareProvider.estimatedFare;
+    final destProvider = Provider.of<DestinationProvider>(context, listen: false);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      //just for test (it goes back to the home page)
-      SnackBar(
-        content: Text(
-          'your driver is near, estimated fare: \$${estimatedFare?.toStringAsFixed(2)}',
+    // Collect route information
+    final  routeInfo = {
+      'pickup': {
+        'address': _originAddress ?? 'Current Location',
+        'coordinates': _pickupCoordinates ?? GeoPoint(0.0, 0.0), // Replace with actual coords
+      },
+      'destination': {
+        'address': _destinationAddress ?? '',
+        'coordinates': _destinationCoordinates ?? GeoPoint(
+          destProvider.destination!.coordinates.lat.toDouble(),
+          destProvider.destination!.coordinates.lng.toDouble(),
         ),
+      },
+      'fare': fareProvider.estimatedFare ?? 0.0,
+      'distance': fareProvider.estimatedDistance ?? 0.0,
+      'duration': fareProvider.estimatedDuration ?? 0.0,
+    };
+
+    // Navigate to AcceptDriverPage with route info
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AcceptDriverPage(routeInfo: routeInfo),
       ),
     );
-
-    //for now just go back to the home page
-    Navigator.pop(context);
   }
 
   @override
