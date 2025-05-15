@@ -1,0 +1,59 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class Ride {
+  final String rideId;
+  final String riderId;
+  final String driverId;
+  final String status;
+  final Map<String, dynamic> pickup;
+  final Map<String, dynamic> destination;
+  final double fare;
+  final double distance;
+  final double duration;
+  final Map<String, dynamic> timestamps;
+
+  Ride({
+    required this.rideId,
+    required this.riderId,
+    required this.driverId,
+    required this.status,
+    required this.pickup,
+    required this.destination,
+    required this.fare,
+    required this.distance,
+    required this.duration,
+    required this.timestamps,
+  });
+
+  // Create Ride from Firestore document
+  factory Ride.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return Ride(
+      rideId: doc.id,
+      riderId: data['riderId'] as String,
+      driverId: data['driverId'] as String,
+      status: data['status'] as String,
+      pickup: data['pickup'] as Map<String, dynamic>,
+      destination: data['destination'] as Map<String, dynamic>,
+      fare: (data['fare'] as num).toDouble(),
+      distance: (data['distance'] as num).toDouble(),
+      duration: (data['duration'] as num).toDouble(),
+      timestamps: data['timestamps'] as Map<String, dynamic>,
+    );
+  }
+
+  // Convert Ride to a map for Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'riderId': riderId,
+      'driverId': driverId,
+      'status': status,
+      'pickup': pickup,
+      'destination': destination,
+      'fare': fare,
+      'distance': distance,
+      'duration': duration,
+      'timestamps': timestamps,
+    };
+  }
+}

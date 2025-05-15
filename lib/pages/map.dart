@@ -26,7 +26,7 @@ class _Map extends State<Map> {
   late DestinationProvider _destinationProvider;
   mp.CameraOptions? _initialCameraOptions;
   late UserModel user;
-        
+
 
   @override
   void didChangeDependencies() {
@@ -68,21 +68,21 @@ class _Map extends State<Map> {
     final destination = _destinationProvider.destination!;
 
     //calculated the southwest and northeast points for the bounds
-    final double minLon = [
+    final num minLon = [
       currentPosition.longitude,
-      destination.coordinates.lng.toDouble(),
+      destination.coordinates.lng,
     ].reduce((a, b) => a < b ? a : b);
-    final double minLat = [
+    final num minLat = [
       currentPosition.latitude,
-      destination.coordinates.lat.toDouble(),
+      destination.coordinates.lat,
     ].reduce((a, b) => a < b ? a : b);
-    final double maxLon = [
+    final num maxLon = [
       currentPosition.longitude,
-      destination.coordinates.lng.toDouble(),
+      destination.coordinates.lng,
     ].reduce((a, b) => a > b ? a : b);
-    final double maxLat = [
+    final num maxLat = [
       currentPosition.latitude,
-      destination.coordinates.lat.toDouble(),
+      destination.coordinates.lat,
     ].reduce((a, b) => a > b ? a : b);
 
     //create the bounds
@@ -126,7 +126,7 @@ class _Map extends State<Map> {
       ),
     );
 
-    
+
 
     var routeData = await getDirectionsRoute(origin, destination);
     var featureCollection = routeData["featureCollection"];
@@ -227,7 +227,7 @@ class _Map extends State<Map> {
       accuracy: gl.LocationAccuracy.high,
       distanceFilter: 100,
     );
-    
+
     userPositionStream?.cancel();
     userPositionStream = gl.Geolocator.getPositionStream(
       locationSettings: locationSettings,
@@ -249,9 +249,9 @@ class _Map extends State<Map> {
         var features = featureCollection['features'] as List;
         var rawCods = features[0]["geometry"]["coordinates"] as List;
         var cods =
-            rawCods
-                .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
-                .toList();
+        rawCods
+            .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
+            .toList();
         await mapboxMap?.style.updateGeoJSONSourceFeatures(
           "route",
           "updated_route",
@@ -267,8 +267,8 @@ class _Map extends State<Map> {
             .collection('users')
             .doc(user.id)
             .update({
-              'location': GeoPoint(position.latitude, position.longitude),
-            });
+          'location': GeoPoint(position.latitude, position.longitude),
+        });
       }
     });
   }
@@ -280,10 +280,10 @@ class _Map extends State<Map> {
 
   void createMarker(mp.Point point) async {
     final pointAnnotationManager =
-        await mapboxMap?.annotations.createPointAnnotationManager();
+    await mapboxMap?.annotations.createPointAnnotationManager();
     final Uint8List imageData = await loadMarkerImage();
     mp.PointAnnotationOptions pointAnnotationOptions =
-        mp.PointAnnotationOptions(image: imageData, geometry: point);
+    mp.PointAnnotationOptions(image: imageData, geometry: point);
 
     pointAnnotationManager?.create(pointAnnotationOptions);
   }
@@ -292,14 +292,14 @@ class _Map extends State<Map> {
   Widget build(BuildContext context) {
     return Scaffold(
       body:
-          _initialCameraOptions == null
-              ? Center(child: CircularProgressIndicator())
-              : mp.MapWidget(
-                onMapCreated: _onMapCreated,
-                styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-                onStyleLoadedListener: _onStyleLoadedCallback,
-                cameraOptions: _initialCameraOptions,
-              ),
+      _initialCameraOptions == null
+          ? Center(child: CircularProgressIndicator())
+          : mp.MapWidget(
+        onMapCreated: _onMapCreated,
+        styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+        onStyleLoadedListener: _onStyleLoadedCallback,
+        cameraOptions: _initialCameraOptions,
+      ),
     );
   }
 }
