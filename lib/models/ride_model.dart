@@ -4,7 +4,7 @@ class Ride {
   final String rideId;
   final String riderId;
   final String driverId;
-  final String status;
+  String status;
   final Map<String, dynamic> pickup;
   final Map<String, dynamic> destination;
   final double fare;
