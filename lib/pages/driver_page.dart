@@ -12,29 +12,7 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'dart:async'; 
 import 'package:wassilni/providers/user_provider.dart';
 
-final Ride static_Ride = Ride(
-  rideId: "ride123",
-  riderId: "rider456",
-  driverId: "driver789",
-  status: "requested",
-  pickup: {
-    "address": "Al-Najah University, Nablus",
-    "coordinates": GeoPoint(32.2276, 35.2603),
-  },
-  destination: {
-    "address": "Rafidia Hospital, Nablus",
-    "coordinates": GeoPoint(32.2211, 35.2544),
-  },
-  fare: 10.00,
-  distance: 3.5,
-  duration: 8.0,
-  timestamps: {
-    "requested": Timestamp.now(),
-    "accepted": null,
-    "started": null,
-    "completed": null,
-  },
-);
+
 
 enum DriverState { offline, lookingForRide, online, pickingUp, waiting, droppingOff }
 
@@ -72,14 +50,16 @@ class _DriverMapState extends State<DriverMap> {
   _ridesSubscription = FirebaseFirestore.instance
       .collection('rides')
       .where('driverId', isEqualTo: driverId)
-      .where('status', isEqualTo: 'requested')
+      .where('status', isEqualTo: "requested")
       .snapshots()
       .listen((snapshot) {
         if (snapshot.docs.isNotEmpty) {
           final doc = snapshot.docs.first;
+          print("🚗 Ride Found: ${doc.id}");
           setState(() {
             _currentRide = Ride.fromFirestore(doc);
             driverState = DriverState.online;
+            print("$currentRide");
           });
           // Update providers with new ride data
           _updateProvidersWithRideData(_currentRide!);
