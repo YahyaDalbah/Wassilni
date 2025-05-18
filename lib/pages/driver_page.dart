@@ -81,27 +81,17 @@ class _DriverMapState extends State<DriverMap> {
             _currentRide = Ride.fromFirestore(doc);
             driverState = DriverState.online;
           });
-          
           // Update providers with new ride data
           _updateProvidersWithRideData(_currentRide!);
           print("🚗 New Ride Loaded: ${_currentRide!.rideId}");
         }
       }, onError: (error) => print("🚨 Ride stream error: $error"));
 }
-// 1. Add state variable for current ride
 Ride? _currentRide;
-
 Ride get currentRide => _currentRide!;
-
-// 2. Update the ride listener
-
-
-// 3. Add helper method to update providers
 void _updateProvidersWithRideData(Ride ride) {
   final destProvider = Provider.of<DestinationProvider>(context, listen: false);
   final fareProvider = Provider.of<FareProvider>(context, listen: false);
-
-  // Convert Firestore GeoPoint to Mapbox Points
   final pickupPoint = mp.Point(
     coordinates: mp.Position(
       ride.pickup["coordinates"].longitude,
@@ -115,8 +105,6 @@ void _updateProvidersWithRideData(Ride ride) {
       ride.destination["coordinates"].latitude,
     ),
   );
-
-  // Update providers
   destProvider
     ..pickup = pickupPoint
     ..destination = dropoffPoint;
@@ -129,17 +117,16 @@ void _updateProvidersWithRideData(Ride ride) {
   destProvider.notifyListeners();
   fareProvider.notifyListeners();
 }
-  // Variables for panel content
+
   String panelTitle() {
-    // Get fare from the currentRide object, not from FareProvider
     return "${currentRide.fare.toStringAsFixed(2)}\$";
   }
 
   String panelSubtitle1(BuildContext context) {
-    final provider = Provider.of<DestinationProvider>(context);
-    final distance = provider.currentToPickupDistance?.toStringAsFixed(1) ?? '--';
-    // Use duration from currentRide (Firestore), not fareProvider
-    final duration = (currentRide.duration ?? 0).toInt();
+    final destinationProvider = Provider.of<DestinationProvider>(context);
+    final distance = destinationProvider.currentToPickupDistance?.toStringAsFixed(1) ?? '--';
+    final fareProvider = Provider.of<FareProvider>(context);
+    final duration = (fareProvider.currentToPickupDuration ?? 0).toInt();
     return "$duration min ($distance KM) away";
   }
 
@@ -150,8 +137,8 @@ void _updateProvidersWithRideData(Ride ride) {
   String get panelLocation1 => currentRide.pickup["address"]; // Pickup location
   String get panelLocation2 => currentRide.destination["address"]; // Dropoff location
 
-  // Variables for footer content
-  String get userName => "Rider ${currentRide.riderId}";
+  // Variables for footer content, but not used right now as it is id not name
+  String get userName => "Rider" /*"Rider ${currentRide.riderId}"*/;
 
   Timer? _distanceUpdateTimer;
   Timer? _onlineDistanceTimer; // Timer for online state updates
@@ -176,7 +163,7 @@ void _updateProvidersWithRideData(Ride ride) {
         currentRide.destination["coordinates"].longitude,
       );
 
-      destinationProvider.updateCurrentToDropoffDistance(currentToDropoff / 1000); // Convert to kilometers
+      destinationProvider.updateCurrentToDropoffDistance(currentToDropoff / 1000); 
       
     } catch (e) {
       print("🚨 Failed to update dropoff distance: $e");
@@ -189,7 +176,7 @@ void _updateProvidersWithRideData(Ride ride) {
           driverState == DriverState.pickingUp ||
           driverState == DriverState.droppingOff) {
         await _calculateDistances();
-        // No fareProvider.updateCurrentToPickupDuration
+
       }
     });
   }
@@ -198,20 +185,20 @@ void _updateProvidersWithRideData(Ride ride) {
     setState(() {
       if (driverState == DriverState.offline) {
         driverState = DriverState.lookingForRide;
-        _startRideListener(); // Start listening for ride
-        _calculateDistances(); // Initial calculation
-        _startOnlineUpdates(); // Start periodic updates
+        _startRideListener();  
+        _calculateDistances();
+        _startOnlineUpdates(); 
       } else if (driverState == DriverState.online|| driverState == DriverState.lookingForRide) 
       {
         driverState = DriverState.offline;
-        _onlineDistanceTimer?.cancel(); // Stop updates when going offline
+        _onlineDistanceTimer?.cancel(); 
         resetToDefault();
       }
     }
     );
   }
 
-  // Add route update guards in _calculateDistances
+
   Future<void> _calculateDistances() async {
     try {
       if (driverState != DriverState.online && driverState != DriverState.pickingUp) return;
@@ -219,22 +206,42 @@ void _updateProvidersWithRideData(Ride ride) {
       final currentPosition = await gl.Geolocator.getCurrentPosition();
       final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
 
-      // Calculate current→pickup distance
+     
       final currentToPickup = gl.Geolocator.distanceBetween(
         currentPosition.latitude,
         currentPosition.longitude,
         currentRide.pickup["coordinates"].latitude,
         currentRide.pickup["coordinates"].longitude,
-      ) / 1000; // Convert to KM
+      ) / 1000; 
 
-      // Always update provider (no equality checks)
+    
       destinationProvider.updateDistances(currentToPickup);
+      final fareProvider = Provider.of<FareProvider>(context, listen: false);
+      final currentPoint = mp.Point(
+      coordinates: mp.Position(
+        currentPosition.longitude,
+        currentPosition.latitude,
+      ),
+    );
 
-      // Auto-transition to waiting when close
+
+    final pickupPoint = mp.Point(
+      coordinates: mp.Position(
+        currentRide.pickup["coordinates"].longitude,
+        currentRide.pickup["coordinates"].latitude,
+      ),
+    
+
+    );
+      await fareProvider.updateCurrentToPickupDuration(currentPoint, pickupPoint); // Update duration,
+       
+
+ 
       if (driverState == DriverState.pickingUp && currentToPickup <= 0.015 && mounted) {
         transitionToWaiting();
       }
-
+        //final fareProvider = Provider.of<FareProvider>(context, listen: false);
+        //fareProvider.estimatedDuration;
       
     } catch (e) {
       print("🚨 Distance error: $e");
@@ -247,7 +254,7 @@ void _updateProvidersWithRideData(Ride ride) {
   
   final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
 
-  // Set ONLY pickup point
+
   final pickupPoint = mp.Point(
     coordinates: mp.Position(
       currentRide.pickup["coordinates"].longitude,
@@ -261,14 +268,13 @@ void _updateProvidersWithRideData(Ride ride) {
 
   // Force map refresh
   destinationProvider.notifyListeners();
-  destinationProvider.redrawRoute(); // <-- Call redrawRoute after accepting ride
+  destinationProvider.redrawRoute(); // Call redrawRoute after accepting ride
 }
 
   void startRide() async {
   setState(() => driverState = DriverState.droppingOff);
   final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
 
-  // Set dropoff destination
   final dropoffPoint = mp.Point(
     coordinates: mp.Position(
       currentRide.destination["coordinates"].longitude,
@@ -278,9 +284,9 @@ void _updateProvidersWithRideData(Ride ride) {
 
   destinationProvider.destination = dropoffPoint;
   
-  // Fix notification typo
+ 
   destinationProvider.notifyListeners();
-  destinationProvider.redrawRoute(); // <-- Call redrawRoute after starting ride
+  destinationProvider.redrawRoute(); 
 
   _distanceUpdateTimer = Timer.periodic(
     const Duration(seconds: 5),
@@ -292,7 +298,7 @@ void _updateProvidersWithRideData(Ride ride) {
     final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
     final fareProvider = Provider.of<FareProvider>(context, listen: false);
     setState(() {
-      // Reset the driver's state to "offline"
+      
       driverState = DriverState.offline;
       _foundRide = false;
       _ridesSubscription?.cancel();
@@ -307,7 +313,7 @@ void _updateProvidersWithRideData(Ride ride) {
     destinationProvider.clearAll();
     destinationProvider.clearDistances();
     fareProvider.clear();
-    destinationProvider.redrawRoute(); // <-- Call redrawRoute after reset
+    destinationProvider.redrawRoute(); 
   });
 
 
@@ -337,12 +343,10 @@ void _updateProvidersWithRideData(Ride ride) {
           }
         });
       });
-
-      // No fareProvider.updatePickupDropoffFare
     });
   }
 
-  // In driver_map.dart
+  
 Widget buildDroppingOffPanels() {
   return Consumer<FareProvider>(
     builder: (context, fareProvider, _) {
@@ -362,11 +366,10 @@ Widget buildDroppingOffPanels() {
       child: Scaffold(
       body: Stack(
         children: [
-          // Map widget with a key based on destination
           Positioned.fill(
             child: Map(
               key: ValueKey(
-                  destinationProvider.drawRoute.hashCode), // Reload map when destination changes
+                  destinationProvider.drawRoute.hashCode), // Reload map when redraw changes
             ),
           ),
           // Online/Offline toggle button

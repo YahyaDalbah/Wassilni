@@ -33,11 +33,26 @@ class FareProvider with ChangeNotifier {
   }
 
   double? _currentToPickupDuration; // New property
+  double? _pickupToDropoffDuration; // New property
 
   double? get currentToPickupDuration => _currentToPickupDuration;
+  double? get pickupToDropoffDuration => _pickupToDropoffDuration;
 
-  // Clear all fare-related values
-  void clear() {
+  void updateDurations(double pickupDuration, double dropoffDuration) {
+    _currentToPickupDuration = pickupDuration;
+    _pickupToDropoffDuration = dropoffDuration;
+    notifyListeners();
+  }
+
+  Future<void> updateCurrentToPickupDuration(Point current, Point pickup) async {
+    try {
+      _currentToPickupDuration = await getRouteDuration(current, pickup);
+            notifyListeners();
+    } catch (e) {
+      _currentToPickupDuration = null;
+    }
+  }
+void clear() {
     _estimatedFare = null;
     _estimatedDuration = null;
     _estimatedDistance = null;
