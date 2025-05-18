@@ -12,29 +12,6 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'dart:async'; 
 import 'package:wassilni/providers/user_provider.dart';
 
-final Ride static_Ride = Ride(
-  rideId: "ride123",
-  riderId: "rider456",
-  driverId: "driver789",
-  status: "requested",
-  pickup: {
-    "address": "Al-Najah University, Nablus",
-    "coordinates": GeoPoint(32.2276, 35.2603),
-  },
-  destination: {
-    "address": "Rafidia Hospital, Nablus",
-    "coordinates": GeoPoint(32.2211, 35.2544),
-  },
-  fare: 10.00,
-  distance: 3.5,
-  duration: 8.0,
-  timestamps: {
-    "requested": Timestamp.now(),
-    "accepted": null,
-    "started": null,
-    "completed": null,
-  },
-);
 
 enum DriverState { offline, lookingForRide, online, pickingUp, waiting, droppingOff }
 
@@ -82,6 +59,8 @@ class _DriverMapState extends State<DriverMap> {
             driverState = DriverState.online;
           });
           // Update providers with new ride data
+          // display the notification
+          // or go to notification page
           _updateProvidersWithRideData(_currentRide!);
           print("🚗 New Ride Loaded: ${_currentRide!.rideId}");
         }
