@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:wassilni/providers/user_provider.dart';
 
 
+
 enum DriverState { offline, lookingForRide, online, pickingUp, waiting, droppingOff }
 
 class DriverMap extends StatefulWidget {
@@ -49,14 +50,16 @@ class _DriverMapState extends State<DriverMap> {
   _ridesSubscription = FirebaseFirestore.instance
       .collection('rides')
       .where('driverId', isEqualTo: driverId)
-      .where('status', isEqualTo: 'requested')
+      .where('status', isEqualTo: "requested")
       .snapshots()
       .listen((snapshot) {
         if (snapshot.docs.isNotEmpty) {
           final doc = snapshot.docs.first;
+          print("🚗 Ride Found: ${doc.id}");
           setState(() {
             _currentRide = Ride.fromFirestore(doc);
             driverState = DriverState.online;
+            print("$currentRide");
           });
           // Update providers with new ride data
           // display the notification
