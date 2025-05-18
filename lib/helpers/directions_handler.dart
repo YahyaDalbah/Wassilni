@@ -24,6 +24,16 @@ double estimateFare(dynamic route) {
   // Total fare calculation
   return roundedFare;
 }
+Future<double> getRouteDuration(Point origin, Point destination) async {
+  try {
+    final routeData = await getDirectionsRoute(origin, destination);
+    // CORRECTED KEY: Use 'estimatedDuration' instead of 'duration'
+    return routeData['estimatedDuration']?.toDouble() ?? 0.0;
+  } catch (e) {
+    print("⚠️ Duration fallback: $e");
+    return 0.0;
+  }
+}
 
 Future<Map<String,dynamic>> getDirectionsRoute(
   Point origin,
