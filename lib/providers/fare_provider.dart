@@ -1,4 +1,8 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:wassilni/helpers/directions_handler.dart';
 
 class FareProvider with ChangeNotifier {
   double? _estimatedFare;
@@ -25,6 +29,19 @@ class FareProvider with ChangeNotifier {
 
   set estimatedDistance(double? newFare) {
     _estimatedDistance = newFare;
+    notifyListeners();
+  }
+
+  double? _currentToPickupDuration; // New property
+
+  double? get currentToPickupDuration => _currentToPickupDuration;
+
+  // Clear all fare-related values
+  void clear() {
+    _estimatedFare = null;
+    _estimatedDuration = null;
+    _estimatedDistance = null;
+    _currentToPickupDuration = null;
     notifyListeners();
   }
 }

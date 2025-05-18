@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
+import 'package:wassilni/pages/driver_page.dart';
 import 'package:wassilni/pages/home_page.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -84,7 +85,7 @@ class _LoginPageState extends State<LoginPage> {
         await userProvider.login(phoneNumber, password);
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (context) => const DriverMap()),
         );
       }
     } catch (e) {
