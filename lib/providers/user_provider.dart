@@ -29,4 +29,18 @@ class UserProvider extends ChangeNotifier {
     _currentUser = null;
     notifyListeners();
   }
+
+
+Future<void> updateOnlineStatus(bool isOnline) async {
+  if (_currentUser == null) return;
+  
+  await FirebaseFirestore.instance
+    .collection('users')
+    .doc(_currentUser!.id)
+    .update({'isOnline': isOnline});
+
+  _currentUser!.isOnline = isOnline;
+  notifyListeners();
+}
+
 }
