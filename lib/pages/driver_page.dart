@@ -11,6 +11,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:geolocator/geolocator.dart' as gl;
 import 'dart:async'; 
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/providers/ride_provider.dart';
 
 
 
@@ -34,43 +35,56 @@ class _DriverMapState extends State<DriverMap> {
 
   @override
   void dispose() {
+     resetToDefault();
     _ridesSubscription?.cancel();
     _onlineDistanceTimer?.cancel();
     _distanceUpdateTimer?.cancel();
     _waitTimer?.cancel();
     super.dispose();
+   
   }
 
   void _startRideListener() {
   final userProvider = Provider.of<UserProvider>(context, listen: false);
   final driverId = userProvider.currentUser?.id;
-
   if (driverId == null) return;
+
+  bool _initialDataProcessed = false;
 
   _ridesSubscription = FirebaseFirestore.instance
       .collection('rides')
       .where('driverId', isEqualTo: driverId)
       .where('status', isEqualTo: "requested")
-      .snapshots()
-      .listen((snapshot) {
-        if (snapshot.docs.isNotEmpty) {
-          final doc = snapshot.docs.first;
-          print("🚗 Ride Found: ${doc.id}");
-          setState(() {
-            _currentRide = Ride.fromFirestore(doc);
-            driverState = DriverState.online;
-            print("$currentRide");
-          });
-          // Update providers with new ride data
-          // display the notification
-          // or go to notification page
-          _updateProvidersWithRideData(_currentRide!);
-          print("🚗 New Ride Loaded: ${_currentRide!.rideId}");
+      .snapshots(includeMetadataChanges: true)
+      .listen((snapshot) async {
+        if (!_initialDataProcessed) {
+          if (snapshot.metadata.isFromCache) return;
+          _initialDataProcessed = true;
+        }
+
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added &&
+              !change.doc.metadata.hasPendingWrites) {
+            print("New Ride Detected: ${change.doc.id}");
+            setState(() {
+              _currentRide = Ride.fromFirestore(change.doc);
+              driverState = DriverState.online;
+            });
+            await userProvider.updateOnlineStatus(false);
+            _updateProvidersWithRideData(_currentRide!);
+          }
         }
       }, onError: (error) => print("🚨 Ride stream error: $error"));
 }
 Ride? _currentRide;
 Ride get currentRide => _currentRide!;
+set currentRide(Ride? ride) {
+  setState(() {
+    _currentRide = ride;
+  });
+}
+
+  // Update providers with ride data
 void _updateProvidersWithRideData(Ride ride) {
   final destProvider = Provider.of<DestinationProvider>(context, listen: false);
   final fareProvider = Provider.of<FareProvider>(context, listen: false);
@@ -109,11 +123,11 @@ void _updateProvidersWithRideData(Ride ride) {
     final distance = destinationProvider.currentToPickupDistance?.toStringAsFixed(1) ?? '--';
     final fareProvider = Provider.of<FareProvider>(context);
     final duration = (fareProvider.currentToPickupDuration ?? 0).toInt();
-    return "$duration min ($distance KM) away";
+    return "${(duration/60).toStringAsFixed(1)} min ($distance KM) away";
   }
 
   String panelSubtitle2(BuildContext context) {
-    return "${currentRide.duration} min (${currentRide.distance} KM) away";
+    return "${(currentRide.duration/60).toStringAsFixed(1)} min (${(currentRide.distance/1000).toStringAsFixed(1)} KM) away";
   }
 
   String get panelLocation1 => currentRide.pickup["address"]; // Pickup location
@@ -162,8 +176,8 @@ void _updateProvidersWithRideData(Ride ride) {
       }
     });
   }
-
-  void toggleOnlineStatus() {
+  /*
+ void toggleOnlineStatus() {
     setState(() {
       if (driverState == DriverState.offline) {
         driverState = DriverState.lookingForRide;
@@ -178,7 +192,29 @@ void _updateProvidersWithRideData(Ride ride) {
       }
     }
     );
+  }*/
+  
+ void toggleOnlineStatus() async {
+  final userProvider = Provider.of<UserProvider>(context, listen: false);
+  
+  if (driverState == DriverState.offline) {
+    await userProvider.updateOnlineStatus(true);
+    setState(() {
+      driverState = DriverState.lookingForRide;
+    });
+    _startRideListener();  
+    _calculateDistances();
+    _startOnlineUpdates();
+  } 
+  else if (driverState == DriverState.online || driverState == DriverState.lookingForRide) {
+    await userProvider.updateOnlineStatus(false);
+    setState(() {
+      driverState = DriverState.offline;
+    });
+    _onlineDistanceTimer?.cancel(); 
+    resetToDefault();
   }
+}
 
 
   Future<void> _calculateDistances() async {
@@ -219,7 +255,7 @@ void _updateProvidersWithRideData(Ride ride) {
        
 
  
-      if (driverState == DriverState.pickingUp && currentToPickup <= 0.015 && mounted) {
+      if (driverState == DriverState.pickingUp && currentToPickup <= 0.040 && mounted) {
         transitionToWaiting();
       }
         //final fareProvider = Provider.of<FareProvider>(context, listen: false);
@@ -235,7 +271,7 @@ void _updateProvidersWithRideData(Ride ride) {
   setState(() => driverState = DriverState.pickingUp);
   
   final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
-
+  Provider.of<RideProvider>(context, listen: false).updateRideStatus("accepted", currentRide);
 
   final pickupPoint = mp.Point(
     coordinates: mp.Position(
@@ -251,12 +287,14 @@ void _updateProvidersWithRideData(Ride ride) {
   // Force map refresh
   destinationProvider.notifyListeners();
   destinationProvider.redrawRoute(); // Call redrawRoute after accepting ride
+
+  
 }
 
   void startRide() async {
   setState(() => driverState = DriverState.droppingOff);
   final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
-
+Provider.of<RideProvider>(context, listen: false).updateRideStatus("in_progress", currentRide);
   final dropoffPoint = mp.Point(
     coordinates: mp.Position(
       currentRide.destination["coordinates"].longitude,
@@ -274,13 +312,18 @@ void _updateProvidersWithRideData(Ride ride) {
     const Duration(seconds: 5),
     (timer) => _updateDroppingOffDistance()
   );
+
+  
 }
 
   void resetToDefault() {
     final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
     final fareProvider = Provider.of<FareProvider>(context, listen: false);
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    userProvider.updateOnlineStatus(false); 
     setState(() {
-      
+      currentRide = null;
+      _foundRide = false;
       driverState = DriverState.offline;
       _foundRide = false;
       _ridesSubscription?.cancel();
@@ -291,7 +334,7 @@ void _updateProvidersWithRideData(Ride ride) {
   // Properly cancel and nullify subscription
     _ridesSubscription?.cancel();
     _ridesSubscription = null;
-    
+    _currentRide = null; // Reset current ride
     destinationProvider.clearAll();
     destinationProvider.clearDistances();
     fareProvider.clear();
@@ -336,7 +379,10 @@ Widget buildDroppingOffPanels() {
         userName: "Rider ${currentRide.riderId}",
         distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
         estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
-        onCompleteRide: resetToDefault,
+        onCompleteRide: () {
+          Provider.of<RideProvider>(context, listen: false).updateRideStatus("finished", currentRide);
+          resetToDefault();
+        },
       );
     },
   );}
@@ -378,6 +424,9 @@ Widget buildDroppingOffPanels() {
                     panelLocation1: panelLocation1,
                     panelLocation2: panelLocation2,
                     onAcceptRide: acceptRide,
+                    onCancelRide:()  {       
+                      Provider.of<RideProvider>(context, listen: false).updateRideStatus("canceled", currentRide);
+                      resetToDefault();},
                   ),
                   collapsed: buildCollapsedPanel("You're Online"),
                 );
@@ -415,7 +464,10 @@ Widget buildDroppingOffPanels() {
                 userName: userName,
                 waitTime: _formatWaitTime(),
                 onStartRide: startRide,
-                onCancelRide: _isCancelEnabled ? resetToDefault : null, // Disable when timer running
+                onCancelRide: _isCancelEnabled ? () {
+    Provider.of<RideProvider>(context, listen: false).updateRideStatus("canceled", currentRide);
+    resetToDefault();
+  } : null,
                 isCancelEnabled: _isCancelEnabled, // Pass enabled state
               ),
               collapsed: buildCollapsedPanel(
@@ -434,7 +486,10 @@ Widget buildDroppingOffPanels() {
         userName: userName,
         distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
         estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
-        onCompleteRide: resetToDefault,
+        onCompleteRide: () {
+          Provider.of<RideProvider>(context, listen: false).updateRideStatus("finished", currentRide);
+          resetToDefault();
+        },
       ),
     ),
               collapsed: buildCollapsedPanel("Dropping Off $userName"),
