@@ -31,7 +31,6 @@ class _Map extends State<Map> {
   mp.PointAnnotationManager? pointAnnotationManager;
   StreamSubscription<DocumentSnapshot>? _driverLocationSub;
 
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -47,12 +46,12 @@ class _Map extends State<Map> {
     }
     _initializeCamera();
     _setupPositionTracking();
-    var ride = Provider.of<RideProvider>(context,listen: false).currentRide;
-    if(ride != null && user.type.name == "rider") _startTrackingDriver();
+    var ride = Provider.of<RideProvider>(context, listen: false).currentRide;
+    if (ride != null && user.type.name == "rider") _startTrackingDriver();
   }
 
   @override
-   @override
+  @override
   void dispose() {
     // Proper cleanup sequence
     userPositionStream?.cancel();
@@ -67,15 +66,18 @@ class _Map extends State<Map> {
 
   void _startTrackingDriver() {
     // Replace with actual driver ID from your system
-    final driverId = Provider.of<RideProvider>(context,listen: false).currentRide!.driverId; 
-    final driverDoc = FirebaseFirestore.instance.collection('users').doc(driverId);
+    final driverId =
+        Provider.of<RideProvider>(context, listen: false).currentRide!.driverId;
+    final driverDoc = FirebaseFirestore.instance
+        .collection('users')
+        .doc(driverId);
 
     _driverLocationSub = driverDoc.snapshots().listen((snapshot) async {
       if (!snapshot.exists) return;
 
       final location = snapshot['location'] as GeoPoint;
       final point = mp.Point(
-        coordinates: mp.Position(location.longitude, location.latitude)
+        coordinates: mp.Position(location.longitude, location.latitude),
       );
       _destinationProvider.destination = point;
       var position = await gl.Geolocator.getCurrentPosition();
@@ -161,15 +163,13 @@ class _Map extends State<Map> {
       ),
     );
 
-
-
     var routeData = await getDirectionsRoute(origin, destination);
     var featureCollection = routeData["featureCollection"];
     var estimatedFare = routeData["estimatedFare"];
     var distance = routeData["estimatedDistance"];
     var duration = routeData["estimatedDuration"];
 
-    if (context.mounted) {
+    if (mounted) {
       Provider.of<FareProvider>(context, listen: false).estimatedFare =
           estimatedFare;
       Provider.of<FareProvider>(context, listen: false).estimatedDistance =
@@ -268,49 +268,56 @@ class _Map extends State<Map> {
       locationSettings: locationSettings,
     ).listen((gl.Position position) async {
       if (mapboxMap != null && _destinationProvider.destination != null) {
-        
         _updatePositionAndRoute(position);
         //driver update
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.id)
             .update({
-          'location': GeoPoint(position.latitude, position.longitude),
-        });
+              'location': GeoPoint(position.latitude, position.longitude),
+            });
       }
     });
   }
 
   void _updatePositionAndRoute(gl.Position position) async {
     var origin = mp.Point(
-          coordinates: mp.Position(position.longitude, position.latitude),
-        );
-        var destination = _destinationProvider.destination!;
+      coordinates: mp.Position(position.longitude, position.latitude),
+    );
+    var destination = _destinationProvider.destination!;
 
-        var routeData = await getDirectionsRoute(origin, destination);
-        var distance = routeData["estimatedDistance"];
-        var duration = routeData["estimatedDuration"];
-        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
-            distance;
-        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
-            duration;
-        var featureCollection = routeData["featureCollection"];
-        var features = featureCollection['features'] as List;
-        var rawCods = features[0]["geometry"]["coordinates"] as List;
-        var cods =
+    var routeData = await getDirectionsRoute(origin, destination);
+    var distance = routeData["estimatedDistance"];
+    var duration = routeData["estimatedDuration"];
+    if (mounted) {
+      if(distance == 0){
+        distance = 0.0;
+      }
+      if(duration == 0){
+        duration = 0.0;
+      }
+      Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+          distance;
+      Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+          duration;
+    }
+    var featureCollection = routeData["featureCollection"];
+    var features = featureCollection['features'] as List;
+    var rawCods = features[0]["geometry"]["coordinates"] as List;
+    var cods =
         rawCods
             .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
             .toList();
-        await mapboxMap?.style.updateGeoJSONSourceFeatures(
-          "route",
-          "updated_route",
-          [
-            mp.Feature(
-              id: "route_line", //same feature id that we used to create the source
-              geometry: mp.LineString(coordinates: cods),
-            ),
-          ],
-        );
+    await mapboxMap?.style.updateGeoJSONSourceFeatures(
+      "route",
+      "updated_route",
+      [
+        mp.Feature(
+          id: "route_line", //same feature id that we used to create the source
+          geometry: mp.LineString(coordinates: cods),
+        ),
+      ],
+    );
   }
 
   Future<Uint8List> loadMarkerImage(String image) async {
@@ -335,14 +342,14 @@ class _Map extends State<Map> {
   Widget build(BuildContext context) {
     return Scaffold(
       body:
-      _initialCameraOptions == null
-          ? Center(child: CircularProgressIndicator())
-          : mp.MapWidget(
-        onMapCreated: _onMapCreated,
-        styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-        onStyleLoadedListener: _onStyleLoadedCallback,
-        cameraOptions: _initialCameraOptions,
-      ),
+          _initialCameraOptions == null
+              ? Center(child: CircularProgressIndicator())
+              : mp.MapWidget(
+                onMapCreated: _onMapCreated,
+                styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+                onStyleLoadedListener: _onStyleLoadedCallback,
+                cameraOptions: _initialCameraOptions,
+              ),
     );
   }
 }
