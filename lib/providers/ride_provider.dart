@@ -17,28 +17,26 @@ class RideProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void updateStatus(String newStatus) {
-    if (_currentRide != null) {
-      _currentRide = Ride(
-        rideId: _currentRide!.rideId,
-        riderId: _currentRide!.riderId,
-        driverId: _currentRide!.driverId,
-        status: newStatus,
-        pickup: _currentRide!.pickup,
-        destination: _currentRide!.destination,
-        fare: _currentRide!.fare,
-        distance: _currentRide!.distance,
-        duration: _currentRide!.duration,
-        timestamps: {
-          ..._currentRide!.timestamps,
-          newStatus == 'accepted' ? 'accepted' : newStatus == 'in_progress' ? 'started' : 'completed': Timestamp.now(),
-        },
-      );
-      FirebaseFirestore.instance.collection('rides').doc(_currentRide!.rideId).update({
+  Future<void> updateRideStatus(String newStatus, Ride? ride) async {
+  if (ride == null || ride!.rideId.isEmpty) return;
+
+  try {
+    // 1. Update Firestore
+    await FirebaseFirestore.instance
+      .collection('rides')
+      .doc(ride!.rideId)
+      .update({
         'status': newStatus,
-        'timestamps.$newStatus': Timestamp.now(),
+        'timestamps.$newStatus': FieldValue.serverTimestamp(),
       });
-      notifyListeners();
-    }
+
+    // 2. Update local state directly (no copyWith needed)
+    ride!.status = newStatus;
+    notifyListeners();
+
+  } catch (e) {
+    print('Error updating ride status: $e');
+    rethrow;
   }
+}
 }

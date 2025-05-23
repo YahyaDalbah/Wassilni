@@ -7,6 +7,7 @@ Widget buildPanelContent({
   required String panelLocation1,
   required String panelLocation2,
   required VoidCallback onAcceptRide,
+  required VoidCallback onCancelRide,
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -42,27 +43,47 @@ Widget buildPanelContent({
         ),
       ),
       const Spacer(),
-      Center(
-        child: ElevatedButton(
-          onPressed: onAcceptRide,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green, // Changed to green
-            padding: const EdgeInsets.symmetric(vertical: 15),
-            fixedSize: const Size(300, 50), // Approximate 80% width for most screens
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+      Column(
+        children: [
+          // Accept Ride Button (same as before)
+          ElevatedButton(
+            onPressed: onAcceptRide,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              minimumSize: const Size(300, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text(
+              "Accept Ride",
+              style: TextStyle(fontSize: 16, color: Colors.white),
             ),
           ),
-          child: const Text(
-            "Accept Ride",
-            style: TextStyle(fontSize: 16, color: Colors.white),
+          const SizedBox(height: 10),
+          // Cancel Button
+          ElevatedButton(
+            onPressed: onCancelRide,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              minimumSize: const Size(300, 50),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text(
+              "Cancel",
+              style: TextStyle(fontSize: 16, color: Colors.white),
+            ),
           ),
-        ),
+        ],
       ),
+      const SizedBox(height: 10),
     ],
   );
 }
-
 Widget buildWaitingPanel({
   required String userName,
   required String waitTime,
