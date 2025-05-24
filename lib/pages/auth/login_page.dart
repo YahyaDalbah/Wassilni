@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
-import 'package:wassilni/pages/home_page.dart';
+import 'package:wassilni/pages/rider_screen.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:wassilni/providers/user_provider.dart';
@@ -87,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
         if (userProvider.currentUser!.type == UserType.rider) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
+            MaterialPageRoute(builder: (context) => const RiderScreen()),
           );
         }else{
           Navigator.pushReplacement(

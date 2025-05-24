@@ -380,7 +380,7 @@ Widget buildDroppingOffPanels() {
         distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
         estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
         onCompleteRide: () {
-          Provider.of<RideProvider>(context, listen: false).updateRideStatus("finished", currentRide);
+          Provider.of<RideProvider>(context, listen: false).updateRideStatus("completed", currentRide);
           resetToDefault();
         },
       );
@@ -487,7 +487,7 @@ Widget buildDroppingOffPanels() {
         distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
         estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
         onCompleteRide: () {
-          Provider.of<RideProvider>(context, listen: false).updateRideStatus("finished", currentRide);
+          Provider.of<RideProvider>(context, listen: false).updateRideStatus("completed", currentRide);
           resetToDefault();
         },
       ),
