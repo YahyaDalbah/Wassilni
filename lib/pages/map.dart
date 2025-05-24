@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
+import 'package:wassilni/models/ride_model.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
@@ -30,6 +31,7 @@ class _Map extends State<Map> {
   mp.PointAnnotation? _marker;
   mp.PointAnnotationManager? pointAnnotationManager;
   StreamSubscription<DocumentSnapshot>? _driverLocationSub;
+  Ride? ride;
 
   @override
   void didChangeDependencies() {
@@ -46,7 +48,7 @@ class _Map extends State<Map> {
     }
     _initializeCamera();
     _setupPositionTracking();
-    var ride = Provider.of<RideProvider>(context, listen: false).currentRide;
+    ride = Provider.of<RideProvider>(context, listen: false).currentRide;
     if (ride != null && user.type.name == "rider") _startTrackingDriver();
   }
 
@@ -170,8 +172,10 @@ class _Map extends State<Map> {
     var duration = routeData["estimatedDuration"];
 
     if (mounted) {
-      Provider.of<FareProvider>(context, listen: false).estimatedFare =
-          estimatedFare;
+      if (ride == null) {
+        Provider.of<FareProvider>(context, listen: false).estimatedFare =
+            estimatedFare;
+      }
       Provider.of<FareProvider>(context, listen: false).estimatedDistance =
           distance;
       Provider.of<FareProvider>(context, listen: false).estimatedDuration =
@@ -290,10 +294,10 @@ class _Map extends State<Map> {
     var distance = routeData["estimatedDistance"];
     var duration = routeData["estimatedDuration"];
     if (mounted) {
-      if(distance == 0){
+      if (distance == 0) {
         distance = 0.0;
       }
-      if(duration == 0){
+      if (duration == 0) {
         duration = 0.0;
       }
       Provider.of<FareProvider>(context, listen: false).estimatedDistance =

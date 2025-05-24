@@ -20,7 +20,7 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
-  int _currentIndex = 1;
+  int _currentIndex = 2;
 
   @override
   void initState() {
@@ -197,28 +197,6 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.black,
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-          //navigation logic
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-        ],
       ),
     );
   }
