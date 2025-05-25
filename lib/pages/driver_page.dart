@@ -196,6 +196,8 @@ void _updateProvidersWithRideData(Ride ride) {
   
  void toggleOnlineStatus() async {
   final userProvider = Provider.of<UserProvider>(context, listen: false);
+  userProvider.logout();
+  return;
   
   if (driverState == DriverState.offline) {
     await userProvider.updateOnlineStatus(true);
@@ -394,6 +396,7 @@ Widget buildDroppingOffPanels() {
       child: Scaffold(
       body: Stack(
         children: [
+          //TODO: add logout button, on top right or top left of the screeb
           Positioned.fill(
             child: Map(
               key: ValueKey(

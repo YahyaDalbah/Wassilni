@@ -22,12 +22,12 @@ android {
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
@@ -42,26 +42,25 @@ android {
     }
     signingConfigs {
         getByName("debug") {
-            storeFile = file("../releasFile/dev_release.jks")
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
             storePassword = "android"
-            keyAlias = "dev_key"
+            keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
 
         create("release") {
-            storeFile = file("../releasFile/dev_release.jks")
-            storePassword = "android"
-            keyAlias = "dev_key"
-            keyPassword = "android"
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
         }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("release")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -69,12 +68,4 @@ android {
 
 flutter {
     source = "../.."
-}
-dependencies {
-    // Import the BoM for the Firebase platform
-    implementation(platform("com.google.firebase:firebase-bom:33.14.0"))
-
-    // Add the dependency for the Firebase Authentication library
-    implementation("com.google.firebase:firebase-auth")
-    // Add other Firebase dependencies here if needed
 }

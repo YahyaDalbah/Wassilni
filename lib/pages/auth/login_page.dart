@@ -2,12 +2,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
+import 'package:wassilni/pages/driver_page.dart';
 import 'package:wassilni/pages/home_page.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../rider_screen.dart';
+
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -91,10 +95,17 @@ class _LoginPageState extends State<LoginPage> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('logged_in_phone', phoneNumber);
 
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
-        );
+        if (userProvider.currentUser!.type == UserType.rider) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const RiderScreen()),
+          );
+        }else{
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const DriverMap()),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
