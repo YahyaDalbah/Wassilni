@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/models/ride_model.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/map.dart';
@@ -394,13 +395,38 @@ Widget buildDroppingOffPanels() {
       child: Scaffold(
       body: Stack(
         children: [
-          //TODO: add logout button, on top right or top left of the screeb
           Positioned.fill(
             child: Map(
               key: ValueKey(
                   destinationProvider.drawRoute.hashCode), // Reload map when redraw changes
             ),
           ),
+          // Logout Button (Top-Left, only in offline state)
+          if (driverState == DriverState.offline)
+            Positioned(
+              top: 40, // Increased for better visibility
+              left: 10,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black54,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: IconButton(
+                  iconSize: 30,
+                  icon: const Icon(Icons.logout, color: Colors.white),
+                  onPressed: () async {
+                    final userProvider = Provider.of<UserProvider>(context, listen: false);
+                    await userProvider.logout();
+                    if (mounted) {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginPage()),
+                      );
+                    }
+                  },
+                ),
+              ),
+            ),
           // Online/Offline toggle button
           if (driverState == DriverState.offline ||driverState == DriverState.lookingForRide || driverState == DriverState.online)
             buildOnlineOfflineButton(
