@@ -42,10 +42,10 @@ class _Map extends State<Map> {
   @override
   void initState() {
     super.initState();
-    user = Provider.of<UserProvider>(context, listen: false).currentUser!;
     if (Provider.of<UserProvider>(context, listen: false).currentUser == null) {
       throw Exception("user is not set");
     }
+    user = Provider.of<UserProvider>(context, listen: false).currentUser!;
     _initializeCamera();
     _setupPositionTracking();
     ride = Provider.of<RideProvider>(context, listen: false).currentRide;

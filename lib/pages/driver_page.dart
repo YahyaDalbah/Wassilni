@@ -394,6 +394,7 @@ Widget buildDroppingOffPanels() {
       child: Scaffold(
       body: Stack(
         children: [
+          //TODO: add logout button, on top right or top left of the screeb
           Positioned.fill(
             child: Map(
               key: ValueKey(

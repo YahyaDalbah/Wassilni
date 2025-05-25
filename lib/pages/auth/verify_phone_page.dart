@@ -8,6 +8,8 @@ import 'dart:convert';
 
 import 'package:wassilni/pages/home_page.dart';
 import 'package:wassilni/models/user_model.dart';
+import '../rider_screen.dart';
+
 
 class VerifyPhonePage extends StatefulWidget {
   final String verificationId;
@@ -106,7 +108,7 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
 
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const HomePage()),
+          MaterialPageRoute(builder: (context) => const RiderScreen()),
         );
       }
     } catch (e) {
