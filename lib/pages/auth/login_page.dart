@@ -2,13 +2,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
-import 'package:wassilni/pages/driver_page.dart';
-import 'package:wassilni/pages/rider_screen.dart';
+import 'package:wassilni/pages/home_page.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -57,10 +56,15 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
+      String cleanPhoneNumber = phoneNumber.trim();
+      if (!cleanPhoneNumber.startsWith('+')) {
+        cleanPhoneNumber = '+$cleanPhoneNumber';
+      }
+
       final querySnapshot =
           await FirebaseFirestore.instance
               .collection('users')
-              .where('phone', isEqualTo: phoneNumber)
+              .where('phone', isEqualTo: cleanPhoneNumber)
               .get();
 
       if (querySnapshot.docs.isEmpty) {
@@ -84,17 +88,13 @@ class _LoginPageState extends State<LoginPage> {
 
       if (mounted) {
         await userProvider.login(phoneNumber, password);
-        if (userProvider.currentUser!.type == UserType.rider) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const RiderScreen()),
-          );
-        }else{
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const DriverMap()),
-          );
-        }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('logged_in_phone', phoneNumber);
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -156,15 +156,13 @@ class _LoginPageState extends State<LoginPage> {
               if (val!.isEmpty) {
                 return "Phone number is required";
               }
-              if (!RegExp(r'^\+').hasMatch(val)) {
-                return "Your number must start with (+) and your national prefix";
-              }
               if (val.length < 10 || val.length > 15) {
                 return "Your number must be between 10 - 15 digits";
               }
               return null;
             },
             decoration: InputDecoration(
+              prefixText: '+',
               contentPadding: EdgeInsets.symmetric(vertical: 10),
               prefixStyle: TextStyle(color: Colors.white, fontSize: 20),
               labelText: "Phone",
@@ -236,7 +234,7 @@ class _LoginPageState extends State<LoginPage> {
                 if (formState.currentState!.validate()) {
                   try {
                     await _loginWithPhone(
-                      _phoneController.text,
+                      "+${_phoneController.text}",
                       _passwordController.text,
                     );
                   } catch (e) {
