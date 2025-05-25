@@ -404,8 +404,8 @@ Widget buildDroppingOffPanels() {
           // Logout Button (Top-Left, only in offline state)
           if (driverState == DriverState.offline)
             Positioned(
-              top: 40, // Increased for better visibility
-              left: 10,
+              top: 40, 
+              left: 20,
               child: Container(
                 decoration: BoxDecoration(
                   color: Colors.black54,
