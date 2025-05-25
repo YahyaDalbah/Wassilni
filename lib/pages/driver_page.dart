@@ -401,7 +401,7 @@ Widget buildDroppingOffPanels() {
                   destinationProvider.drawRoute.hashCode), // Reload map when redraw changes
             ),
           ),
-          // Logout Button (Top-Left, only in offline state)
+         
           if (driverState == DriverState.offline)
             Positioned(
               top: 40, 
