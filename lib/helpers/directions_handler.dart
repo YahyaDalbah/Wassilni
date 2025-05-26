@@ -53,8 +53,8 @@ Future<Map<String,dynamic>> getDirectionsRoute(
     // Extract the route geometry from the response
     final route = data['routes'][0];
     var estimatedFare = estimateFare(route);
-    var distance = route['distance']; // in meters
-    var duration = route['duration']; // in seconds
+    var distance = 1.0 + route['distance']; // in meters
+    var duration = 1.0 + route['duration']; // in seconds
     final geometry = route['geometry'];
     // Create a GeoJSON feature from the route geometry
     final routeFeature = {

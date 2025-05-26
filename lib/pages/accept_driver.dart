@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:provider/provider.dart';
 import 'package:wassilni/models/user_model.dart';
+import 'package:wassilni/pages/to_destination.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'package:wassilni/providers/ride_provider.dart';
@@ -33,6 +34,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
   RideProvider? _rideProvider;
   bool _isInitialized = false;
   bool _isMounted = false;
+  StreamSubscription<DocumentSnapshot>? _rideSubscription;
 
   @override
   void initState() {
@@ -151,7 +153,6 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
 
       if (closestDriver != null) {
         _driver = closestDriver;
-        _updateDriverDestination(forceUpdate: true);
         _listenToDriverLocation();
         _updateETA();
         await _createRide();
@@ -200,32 +201,37 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
       final rideRef = await FirebaseFirestore.instance.collection('rides').add(ride.toMap());
       final rideDoc = await rideRef.get();
       _rideProvider!.setCurrentRide(Ride.fromFirestore(rideDoc));
+
+      _rideSubscription = FirebaseFirestore.instance
+        .collection('rides')
+        .doc(rideDoc.id)
+        .snapshots()
+        .listen((snapshot) async {
+      if (!_isMounted) return;
+      final updatedRide = Ride.fromFirestore(snapshot);
+      _rideProvider!.setCurrentRide(updatedRide);
+      if (updatedRide.status == 'in_progress') {
+        print("################################");
+        print("triggered");
+        final geoPoint = updatedRide.destination['coordinates'] as GeoPoint;
+        final newDestination = mp.Point(
+          coordinates: mp.Position(
+            geoPoint.longitude,
+            geoPoint.latitude,
+          ),
+        );
+        _destinationProvider!.destination = newDestination;
+        
+        Navigator.push(context, MaterialPageRoute(
+          builder: (context) => ToDestination(),
+        ));
+      }
+    });
     } catch (e) {
       print("Error creating ride: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error creating ride: $e')),
       );
-    }
-  }
-
-  void _updateDriverDestination({bool forceUpdate = false}) {
-    if (_driver == null || _destinationProvider == null || !_isMounted) return;
-    try {
-      Future.microtask(() {
-        if (_isMounted && _destinationProvider != null && _driver != null) {
-          final updatedDestination = mp.Point(
-            coordinates: mp.Position(
-              _driver!.location.longitude,
-              _driver!.location.latitude,
-            ),
-          );
-          if (forceUpdate || _destinationProvider!.destination != updatedDestination) {
-            _destinationProvider!.destination = updatedDestination;
-          }
-        }
-      });
-    } catch (e) {
-      print("Error updating driver destination: $e");
     }
   }
 
@@ -239,7 +245,6 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
       if (!_isMounted || !snapshot.exists) return;
       final updatedDriver = UserModel.fromFireStore(snapshot);
       setState(() => _driver = updatedDriver);
-      _updateDriverDestination();
       _updateETA();
     }, onError: (e) => print("Error in driver location subscription: $e"));
   }

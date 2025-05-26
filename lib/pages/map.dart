@@ -49,10 +49,9 @@ class _Map extends State<Map> {
     _initializeCamera();
     _setupPositionTracking();
     ride = Provider.of<RideProvider>(context, listen: false).currentRide;
-    if (ride != null && user.type.name == "rider") _startTrackingDriver();
+    if (ride != null && user.type.name == "rider" && ride!.status != "in_progress") _startTrackingDriver();
   }
 
-  @override
   @override
   void dispose() {
     // Proper cleanup sequence
