@@ -47,20 +47,13 @@ android {
             keyAlias = "androiddebugkey"
             keyPassword = "android"
         }
-
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
-            storeFile = file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -68,4 +61,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:32.7.1"))
+    implementation("com.google.firebase:firebase-appcheck-debug:17.1.1")
 }

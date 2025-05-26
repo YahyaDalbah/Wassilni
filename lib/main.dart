@@ -1,6 +1,4 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
@@ -10,7 +8,6 @@ import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
-import 'package:wassilni/pages/home_page.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'pages/rider_screen.dart';
@@ -50,9 +47,7 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    // Initialize the UserProvider from the widget tree
     final userProvider = Provider.of<UserProvider>(
-      // Use a context that has access to the provider
       context,
       listen: false,
     );
@@ -71,7 +66,6 @@ class _MyAppState extends State<MyApp> {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          // Check the provider's state directly
           final userProvider = Provider.of<UserProvider>(
             context,
             listen: false,

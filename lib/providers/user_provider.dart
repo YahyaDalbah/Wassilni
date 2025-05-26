@@ -30,7 +30,7 @@ class UserProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('logged_in_phone', phone);
       await prefs.setString('user_id', userDoc.id);
-      
+
       notifyListeners();
     } else {
       throw Exception('No user found with this phone number');
