@@ -243,12 +243,49 @@ class DriverLogic {
   bool get isCancelEnabled => _remainingWaitTime == 0;
 
   void handleRideCancel() async {
-    Provider.of<RideProvider>(context, listen: false).updateRideStatus("canceled", currentRide!);
-    await Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(true);
+    if (!isMounted()) return;
+
+    final context = this.context;
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Ride?'),
+        content: const Text('Are you sure you want to cancel this ride?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('NO'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('YES'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed ?? false) {
+      _performCancellation();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ride canceled')),
+        );
+      }
+    }
+  }
+
+  void _performCancellation() {
+    Provider.of<RideProvider>(context, listen: false)
+      .updateRideStatus("canceled", currentRide!);
+    // Reset logic
+    Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(true);
     driverState = DriverState.lookingForRide;
     _startRideListener(true);
     _calculateDistances();
     _startOnlineUpdates();
+    currentRide = null;
   }
 
   void dispose() {

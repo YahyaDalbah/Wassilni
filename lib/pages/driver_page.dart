@@ -19,16 +19,30 @@ class DriverMap extends StatefulWidget {
 
 class _DriverMapState extends State<DriverMap> {
   late final DriverLogic _logic;
-
+  late final PanelController _foundRideController;
+  late final PanelController _waitingController;
   @override
   void initState() {
     super.initState();
+    _foundRideController = PanelController(); // Initialize all panel controllers
+    _waitingController = PanelController();
     _logic = DriverLogic(
       context,
-      () => mounted ? setState(() {}) : null,
+      () {
+        if (mounted) setState(() {});
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_logic.driverState == DriverState.foundRide && 
+              _foundRideController.isAttached) {
+            _foundRideController.open();
+          }
+          else if (_logic.driverState == DriverState.waiting &&
+              _waitingController.isAttached) {
+            _waitingController.open();
+          }
+        });
+      },
       () => mounted,
     );
-    // Initialize offline status
     Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(false);
   }
 
@@ -107,13 +121,14 @@ class _DriverMapState extends State<DriverMap> {
                 isOnline: _logic.driverState != DriverState.offline,
               ),
 
-            // Ride Found Panel
+            // Found Ride Panel
             if (_logic.driverState == DriverState.foundRide)
               Consumer<DestinationProvider>(
                 builder: (context, _, __) => SlidingUpPanel(
+                  controller: _foundRideController,
                   minHeight: 50,
                   maxHeight: 450,
-                  defaultPanelState: PanelState.OPEN,
+                  defaultPanelState: PanelState.CLOSED,
                   borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   color: Colors.black,
                   panel: buildPanelContent(
@@ -148,8 +163,10 @@ class _DriverMapState extends State<DriverMap> {
             // Waiting Panel
             if (_logic.driverState == DriverState.waiting)
               SlidingUpPanel(
+                controller: _waitingController,
                 minHeight: 100,
                 maxHeight: 180,
+                defaultPanelState: PanelState.CLOSED,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 color: Colors.black,
                 panel: buildWaitingPanel(
@@ -159,16 +176,15 @@ class _DriverMapState extends State<DriverMap> {
                   onCancelRide: _logic.isCancelEnabled ? _logic.handleRideCancel : null,
                   isCancelEnabled: _logic.isCancelEnabled,
                 ),
-                collapsed: buildCollapsedPanel(
-                  "Waiting For Rider - ${_logic.formatWaitTime()}"),
+                collapsed: buildCollapsedPanel("Waiting For Rider - ${_logic.formatWaitTime()}"),
               ),
-        
+
             // Dropping Off Panel
             if (_logic.driverState == DriverState.droppingOff)
               SlidingUpPanel(
                 minHeight: 100,
                 maxHeight: 280,
-                defaultPanelState: PanelState.OPEN,
+                defaultPanelState: PanelState.CLOSED,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                 color: Colors.black,
                 panel: buildDroppingOffPanels(
@@ -201,3 +217,4 @@ class _DriverMapState extends State<DriverMap> {
     );
   }
 }
+
