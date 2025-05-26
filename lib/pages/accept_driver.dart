@@ -341,7 +341,6 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
       return Scaffold(
         body: Stack(
           children: [
-            const Map(),
             Container(
               color: Colors.black.withOpacity(0.7),
               child: const Center(

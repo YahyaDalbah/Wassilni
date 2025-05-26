@@ -1,9 +1,11 @@
+// rides_history.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/services/ride_history_service.dart';
 
 class RidesHistory extends StatefulWidget {
   const RidesHistory({super.key});
@@ -14,7 +16,7 @@ class RidesHistory extends StatefulWidget {
 
 class _RidesHistoryState extends State<RidesHistory>
     with WidgetsBindingObserver {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final RideHistoryService _rideService = RideHistoryService();  // Service instance
   List<QueryDocumentSnapshot> _rides = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
@@ -24,9 +26,6 @@ class _RidesHistoryState extends State<RidesHistory>
   @override
   void initState() {
     user = Provider.of<UserProvider>(context, listen: false).currentUser!;
-    if (Provider.of<UserProvider>(context, listen: false).currentUser == null) {
-      throw Exception("user is not logged in");
-    }
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadInitialRides();
@@ -46,14 +45,11 @@ class _RidesHistoryState extends State<RidesHistory>
 
   void _checkVisibility() {
     final isVisible = ModalRoute.of(context)?.isCurrent ?? false;
-    if (isVisible) {
-      _refreshRides();
-    }
+    if (isVisible) _refreshRides();
   }
 
   Future<void> _refreshRides() async {
     if (!mounted) return;
-
     setState(() {
       _rides.clear();
       _lastDocument = null;
@@ -64,44 +60,29 @@ class _RidesHistoryState extends State<RidesHistory>
 
   Future<void> _loadInitialRides() async {
     setState(() => _isLoading = true);
-    final query = _firestore
-        .collection('rides')
-        .where('riderId', isEqualTo: user.id)
-        .orderBy('timestamps.requested', descending: true)
-        .limit(5);
-
-    final snapshot = await query.get();
-    if (snapshot.docs.isNotEmpty) {
-      _lastDocument = snapshot.docs.last;
-    }
-
-    setState(() {
-      _rides = snapshot.docs;
-      _isLoading = false;
-      _hasMore = snapshot.docs.length == 5;
-    });
+    final result = await _rideService.getRides(
+      userId: user.id,
+    );
+    _updateState(result);
   }
 
   Future<void> _loadMoreRides() async {
     if (!_hasMore || _isLoading) return;
-
     setState(() => _isLoading = true);
-    final query = _firestore
-        .collection('rides')
-        .where('riderId', isEqualTo: user.id)
-        .orderBy('timestamps.requested', descending: true)
-        .startAfterDocument(_lastDocument!)
-        .limit(5);
+    final result = await _rideService.getRides(
+      userId: user.id,
+      lastDocument: _lastDocument,
+    );
+    _updateState(result);
+  }
 
-    final snapshot = await query.get();
-    if (snapshot.docs.isNotEmpty) {
-      _lastDocument = snapshot.docs.last;
-    }
-
+  void _updateState(Map<String, dynamic> result) {
+    if (!mounted) return;
     setState(() {
-      _rides.addAll(snapshot.docs);
+      _rides.addAll(result['rides']);
+      _lastDocument = result['lastDocument'];
       _isLoading = false;
-      _hasMore = snapshot.docs.length == 5;
+      _hasMore = result['hasMore'];
     });
   }
 
@@ -118,81 +99,73 @@ class _RidesHistoryState extends State<RidesHistory>
       body: NotificationListener<ScrollEndNotification>(
         onNotification: (scrollEnd) {
           final metrics = scrollEnd.metrics;
-          if (metrics.atEdge && metrics.pixels != 0) {
-            _loadMoreRides();
-          }
+          if (metrics.atEdge && metrics.pixels != 0) _loadMoreRides();
           return true;
         },
         child: ListView.builder(
           itemCount: _rides.length + (_hasMore ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == _rides.length) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: CircularProgressIndicator(color: Colors.blue[200]),
-                ),
-              );
-            }
-
-            final ride = _rides[index].data() as Map<String, dynamic>;
-            final timestamps = ride['timestamps'] as Map<String, dynamic>;
-            final status = ride['status']?.toString().toUpperCase() ?? '';
-
-            return Card(
-              color: Colors.grey[800],
-              margin: const EdgeInsets.all(8.0),
-              child: ListTile(
-                title: Text(
-                  status,
-                  style: TextStyle(
-                    color: _getStatusColor(status),
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'From: ${ride['pickup']['address']}',
-                      style: TextStyle(color: Colors.grey[300]),
-                    ),
-                    Text(
-                      'To: ${ride['destination']['address']}',
-                      style: TextStyle(color: Colors.grey[300]),
-                    ),
-                    Text(
-                      'Fare: ${ride['fare']}',
-                      style: TextStyle(
-                        color: Colors.blue[200],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Requested: ${DateFormat('MMM dd, yyyy - HH:mm').format((timestamps['requested'] as Timestamp).toDate())}',
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
-                  ],
-                ),
-                leading: Icon(Icons.directions_car, color: Colors.blue[200]),
-              ),
-            );
-          },
+          itemBuilder: (context, index) => _buildListItem(index),
         ),
       ),
     );
   }
 
+  Widget _buildListItem(int index) {
+    if (index == _rides.length) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: CircularProgressIndicator(color: Colors.blue[200]),
+        ),
+      );
+    }
+
+    final ride = _rides[index].data() as Map<String, dynamic>;
+    final timestamps = ride['timestamps'] as Map<String, dynamic>;
+    final status = ride['status']?.toString().toUpperCase() ?? '';
+
+    return Card(
+      color: Colors.grey[800],
+      margin: const EdgeInsets.all(8.0),
+      child: ListTile(
+        title: Text(
+          status,
+          style: TextStyle(
+            color: _getStatusColor(status),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        subtitle: _buildRideDetails(ride, timestamps),
+        leading: Icon(Icons.directions_car, color: Colors.blue[200]),
+      ),
+    );
+  }
+
+  Widget _buildRideDetails(Map<String, dynamic> ride, Map<String, dynamic> timestamps) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('From: ${ride['pickup']['address']}', style: TextStyle(color: Colors.grey[300])),
+        Text('To: ${ride['destination']['address']}', style: TextStyle(color: Colors.grey[300])),
+        Text('Fare: ${ride['fare']}', 
+            style: TextStyle(color: Colors.blue[200], fontWeight: FontWeight.bold)),
+        Text('Requested: ${_formatTimestamp(timestamps['requested'])}',
+            style: TextStyle(color: Colors.grey[400])),
+      ],
+    );
+  }
+
+  String _formatTimestamp(dynamic timestamp) {
+    return DateFormat('MMM dd, yyyy - HH:mm')
+        .format((timestamp as Timestamp).toDate());
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
-      case 'completed':
-        return Colors.green[300]!;
-      case 'canceled':
-        return Colors.red[300]!;
-      case 'in_progress':
-        return Colors.orange[300]!;
-      default:
-        return Colors.grey[300]!;
+      case 'completed': return Colors.green[300]!;
+      case 'canceled': return Colors.red[300]!;
+      case 'in_progress': return Colors.orange[300]!;
+      default: return Colors.grey[300]!;
     }
   }
 }

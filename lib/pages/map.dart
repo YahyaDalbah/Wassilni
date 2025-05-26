@@ -15,6 +15,7 @@ import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/services/firebase_location_service.dart';
 
 class Map extends StatefulWidget {
   const Map({super.key});
@@ -32,6 +33,7 @@ class _Map extends State<Map> {
   mp.PointAnnotationManager? pointAnnotationManager;
   StreamSubscription<DocumentSnapshot>? _driverLocationSub;
   Ride? ride;
+  late FirebaseLocationService _locationService;
 
   @override
   void didChangeDependencies() {
@@ -42,6 +44,7 @@ class _Map extends State<Map> {
   @override
   void initState() {
     super.initState();
+    _locationService = FirebaseLocationService();
     if (Provider.of<UserProvider>(context, listen: false).currentUser == null) {
       throw Exception("user is not set");
     }
@@ -49,12 +52,16 @@ class _Map extends State<Map> {
     _initializeCamera();
     _setupPositionTracking();
     ride = Provider.of<RideProvider>(context, listen: false).currentRide;
-    if (ride != null && user.type.name == "rider" && ride!.status != "in_progress") _startTrackingDriver();
+    if (ride != null &&
+        user.type.name == "rider" &&
+        ride!.status != "in_progress")
+      _startTrackingDriver();
   }
 
   @override
   void dispose() {
     // Proper cleanup sequence
+    _locationService.dispose();
     userPositionStream?.cancel();
     _driverLocationSub?.cancel();
     pointAnnotationManager?.deleteAll();
@@ -66,25 +73,16 @@ class _Map extends State<Map> {
   }
 
   void _startTrackingDriver() {
-    // Replace with actual driver ID from your system
     final driverId =
         Provider.of<RideProvider>(context, listen: false).currentRide!.driverId;
-    final driverDoc = FirebaseFirestore.instance
-        .collection('users')
-        .doc(driverId);
+    _locationService.startTrackingDriver(driverId, _listenerFunction);
+  }
 
-    _driverLocationSub = driverDoc.snapshots().listen((snapshot) async {
-      if (!snapshot.exists) return;
-
-      final location = snapshot['location'] as GeoPoint;
-      final point = mp.Point(
-        coordinates: mp.Position(location.longitude, location.latitude),
-      );
-      _destinationProvider.destination = point;
-      var position = await gl.Geolocator.getCurrentPosition();
-      _updatePositionAndRoute(position);
-      createMarker(point);
-    });
+  void _listenerFunction(mp.Point driverPoint) async {
+    _destinationProvider.destination = driverPoint;
+    var currentPosition = await gl.Geolocator.getCurrentPosition();
+    _updatePositionAndRoute(currentPosition);
+    createMarker(driverPoint);
   }
 
   void _onMapCreated(mp.MapboxMap? controller) async {
@@ -166,12 +164,12 @@ class _Map extends State<Map> {
 
     var routeData = await getDirectionsRoute(origin, destination);
     var featureCollection = routeData["featureCollection"];
-    var estimatedFare = routeData["estimatedFare"];
     var distance = routeData["estimatedDistance"];
     var duration = routeData["estimatedDuration"];
 
     if (mounted) {
       if (ride == null) {
+        var estimatedFare = routeData["estimatedFare"];
         Provider.of<FareProvider>(context, listen: false).estimatedFare =
             estimatedFare;
       }
@@ -196,9 +194,7 @@ class _Map extends State<Map> {
       ),
     );
     //driver update
-    await FirebaseFirestore.instance.collection('users').doc(user.id).update({
-      'location': GeoPoint(currentPosition.latitude, currentPosition.longitude),
-    });
+    await _locationService.updateUserPosition(user.id, currentPosition);
 
     createMarker(destination);
   }
@@ -273,12 +269,7 @@ class _Map extends State<Map> {
       if (mapboxMap != null && _destinationProvider.destination != null) {
         _updatePositionAndRoute(position);
         //driver update
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.id)
-            .update({
-              'location': GeoPoint(position.latitude, position.longitude),
-            });
+        await _locationService.updateUserPosition(user.id, position);
       }
     });
   }
