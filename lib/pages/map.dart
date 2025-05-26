@@ -34,6 +34,7 @@ class _Map extends State<Map> {
   StreamSubscription<DocumentSnapshot>? _driverLocationSub;
   Ride? ride;
   late FirebaseLocationService _locationService;
+  String? _errorMessage;
 
   @override
   void didChangeDependencies() {
@@ -75,14 +76,22 @@ class _Map extends State<Map> {
   void _startTrackingDriver() {
     final driverId =
         Provider.of<RideProvider>(context, listen: false).currentRide!.driverId;
-    _locationService.startTrackingDriver(driverId, _listenerFunction);
+    _locationService.startTrackingDriver(
+      driverId,
+      _listenerFunction,
+      onError: (error) => _showError('Driver tracking failed: $error'),
+    );
   }
 
   void _listenerFunction(mp.Point driverPoint) async {
-    _destinationProvider.destination = driverPoint;
-    var currentPosition = await gl.Geolocator.getCurrentPosition();
-    _updatePositionAndRoute(currentPosition);
-    createMarker(driverPoint);
+    try {
+      _destinationProvider.destination = driverPoint;
+      var currentPosition = await gl.Geolocator.getCurrentPosition();
+      _updatePositionAndRoute(currentPosition);
+      createMarker(driverPoint);
+    } catch (e) {
+      _showError('Failed to update driver position: $e');
+    }
   }
 
   void _onMapCreated(mp.MapboxMap? controller) async {
@@ -153,7 +162,8 @@ class _Map extends State<Map> {
   }
 
   Future<void> _initializeRoute() async {
-    var destination = _destinationProvider.destination!;
+    try{
+      var destination = _destinationProvider.destination!;
     var currentPosition = await gl.Geolocator.getCurrentPosition();
     var origin = mp.Point(
       coordinates: mp.Position(
@@ -197,6 +207,9 @@ class _Map extends State<Map> {
     await _locationService.updateUserPosition(user.id, currentPosition);
 
     createMarker(destination);
+    }catch(e){
+      _showError('Failed to initialize route: $e');
+    }
   }
 
   Future<void> _showDefaultView() async {
@@ -275,43 +288,47 @@ class _Map extends State<Map> {
   }
 
   void _updatePositionAndRoute(gl.Position position) async {
-    var origin = mp.Point(
-      coordinates: mp.Position(position.longitude, position.latitude),
-    );
-    var destination = _destinationProvider.destination!;
+    try {
+      var origin = mp.Point(
+        coordinates: mp.Position(position.longitude, position.latitude),
+      );
+      var destination = _destinationProvider.destination!;
 
-    var routeData = await getDirectionsRoute(origin, destination);
-    var distance = routeData["estimatedDistance"];
-    var duration = routeData["estimatedDuration"];
-    if (mounted) {
-      if (distance == 0) {
-        distance = 0.0;
+      var routeData = await getDirectionsRoute(origin, destination);
+      var distance = routeData["estimatedDistance"];
+      var duration = routeData["estimatedDuration"];
+      if (mounted) {
+        if (distance == 0) {
+          distance = 0.0;
+        }
+        if (duration == 0) {
+          duration = 0.0;
+        }
+        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+            distance;
+        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+            duration;
       }
-      if (duration == 0) {
-        duration = 0.0;
-      }
-      Provider.of<FareProvider>(context, listen: false).estimatedDistance =
-          distance;
-      Provider.of<FareProvider>(context, listen: false).estimatedDuration =
-          duration;
+      var featureCollection = routeData["featureCollection"];
+      var features = featureCollection['features'] as List;
+      var rawCods = features[0]["geometry"]["coordinates"] as List;
+      var cods =
+          rawCods
+              .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
+              .toList();
+      await mapboxMap?.style.updateGeoJSONSourceFeatures(
+        "route",
+        "updated_route",
+        [
+          mp.Feature(
+            id: "route_line", //same feature id that we used to create the source
+            geometry: mp.LineString(coordinates: cods),
+          ),
+        ],
+      );
+    } catch (e) {
+      _showError('Failed to update route: $e');
     }
-    var featureCollection = routeData["featureCollection"];
-    var features = featureCollection['features'] as List;
-    var rawCods = features[0]["geometry"]["coordinates"] as List;
-    var cods =
-        rawCods
-            .map<mp.Position>((coord) => mp.Position(coord[0], coord[1]))
-            .toList();
-    await mapboxMap?.style.updateGeoJSONSourceFeatures(
-      "route",
-      "updated_route",
-      [
-        mp.Feature(
-          id: "route_line", //same feature id that we used to create the source
-          geometry: mp.LineString(coordinates: cods),
-        ),
-      ],
-    );
   }
 
   Future<Uint8List> loadMarkerImage(String image) async {
@@ -320,16 +337,32 @@ class _Map extends State<Map> {
   }
 
   void createMarker(mp.Point point) async {
-    final Uint8List imageData = await loadMarkerImage("assets/location.png");
-    mp.PointAnnotationOptions pointAnnotationOptions =
-        mp.PointAnnotationOptions(image: imageData, geometry: point);
+    try {
+      final Uint8List imageData = await loadMarkerImage("assets/location.png");
+      mp.PointAnnotationOptions pointAnnotationOptions =
+          mp.PointAnnotationOptions(image: imageData, geometry: point);
 
-    if (_marker != null) {
-      _marker!.geometry = point;
-      pointAnnotationManager?.update(_marker!);
-    } else {
-      _marker = await pointAnnotationManager?.create(pointAnnotationOptions);
+      if (_marker != null) {
+        _marker!.geometry = point;
+        pointAnnotationManager?.update(_marker!);
+      } else {
+        _marker = await pointAnnotationManager?.create(pointAnnotationOptions);
+      }
+    } catch (e) {
+      _showError('Failed to update marker: $e');
     }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    setState(() => _errorMessage = message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
@@ -338,11 +371,32 @@ class _Map extends State<Map> {
       body:
           _initialCameraOptions == null
               ? Center(child: CircularProgressIndicator())
-              : mp.MapWidget(
-                onMapCreated: _onMapCreated,
-                styleUri: mp.MapboxStyles.MAPBOX_STREETS,
-                onStyleLoadedListener: _onStyleLoadedCallback,
-                cameraOptions: _initialCameraOptions,
+              : Stack(
+                children: [
+                  mp.MapWidget(
+                    onMapCreated: _onMapCreated,
+                    styleUri: mp.MapboxStyles.MAPBOX_STREETS,
+                    onStyleLoadedListener: _onStyleLoadedCallback,
+                    cameraOptions: _initialCameraOptions,
+                  ),
+                  if (_errorMessage != null)
+                    Positioned(
+                      top: 30,
+                      child: Material(
+                        color: Colors.red[100],
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.error, color: Colors.red),
+                              const SizedBox(width: 8),
+                              Text(_errorMessage!),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
     );
   }
