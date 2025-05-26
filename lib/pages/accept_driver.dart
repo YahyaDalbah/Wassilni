@@ -399,6 +399,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
                 Text(
                   "Finding your driver...",
                   style: TextStyle(color: Colors.white, fontSize: 18),
+
                 ),
               ],
             ),
