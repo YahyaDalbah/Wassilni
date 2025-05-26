@@ -57,7 +57,7 @@ class _DriverMapState extends State<DriverMap> {
   }
 
   String _panelSubtitle1(BuildContext context) {
-    final destinationProvider = Provider.of<DestinationProvider>(context);
+    final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
     final fareProvider = Provider.of<FareProvider>(context);
     final distance = destinationProvider.currentToPickupDistance?.toStringAsFixed(1) ?? '--';
     final duration = (fareProvider.currentToPickupDuration ?? 0).toInt();
