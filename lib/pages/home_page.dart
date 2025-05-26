@@ -20,74 +20,39 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
-  int _currentIndex = 2;
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   Future<void> _searchPlaces(String query) async {
     if (query.length < 3) {
-      setState(() {
-        _suggestions.clear();
-      });
+      setState(() => _suggestions.clear());
       return;
     }
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      final accessToken = dotenv.env["MAPBOX_ACCESS_TOKEN"]!;
-      final endpoint = 'https://api.mapbox.com/geocoding/v5/mapbox.places/$query.json';
-      final url = Uri.parse('$endpoint?access_token=$accessToken&limit=5');
-
+      final url = Uri.parse(
+          'https://api.mapbox.com/geocoding/v5/mapbox.places/$query.json?access_token=${dotenv.env["MAPBOX_ACCESS_TOKEN"]!}&limit=5');
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final features = data['features'] as List;
-
+        final features = json.decode(response.body)['features'] as List;
         setState(() {
           _suggestions.clear();
-          for (var feature in features) {
-            _suggestions.add({
-              'placeName': feature['place_name'],
-              'coordinates': feature['geometry']['coordinates'],
-            });
-          }
+          _suggestions.addAll(features.map((f) => {
+            'placeName': f['place_name'],
+            'coordinates': f['geometry']['coordinates'],
+          }));
         });
       }
     } catch (e) {
       print('Error searching places: $e');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
   void _onSuggestionTap(Map<String, dynamic> place) {
     final coords = place['coordinates'] as List;
-
-    //creating a destination point
-    final destination = Point(
-      coordinates: Position(
-        coords[0], //longitude
-        coords[1], //latitude
-      ),
-    );
-
-    //update the provider
-    Provider.of<DestinationProvider>(context, listen: false).destination = destination;
-
-    //navigate to position_destination page
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PositionDestinationPage()),
-    );
+    Provider.of<DestinationProvider>(context, listen: false).destination =
+        Point(coordinates: Position(coords[0], coords[1]));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const PositionDestinationPage()));
   }
 
   @override
@@ -97,39 +62,25 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // title and logout button
             Positioned(
               top: 20,
               right: 20,
               child: Row(
                 children: [
-                  Text(
-                    'Wassilni',
-                    style: TextStyle(
-                      fontSize: 36,
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(width: 10),
+                  const Text('Wassilni', style: TextStyle(fontSize: 36, color: Colors.white, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 10),
                   IconButton(
-                    icon: Icon(Icons.logout, color: Colors.white),
+                    icon: const Icon(Icons.logout, color: Colors.white),
                     onPressed: () async {
-                      final userProvider = Provider.of<UserProvider>(context, listen: false);
-                      await userProvider.logout();
+                      await Provider.of<UserProvider>(context, listen: false).logout();
                       if (mounted) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
-                        );
+                        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginPage()));
                       }
                     },
                   ),
                 ],
               ),
             ),
-
-            //search
             Positioned(
               top: 80,
               left: 20,
@@ -139,53 +90,32 @@ class _HomePageState extends State<HomePage> {
                 children: [
                   TextField(
                     controller: _controller,
-                    onChanged: (value) {
-                      _searchPlaces(value);
-                    },
-                    style: TextStyle(color: Colors.white),
+                    onChanged: _searchPlaces,
+                    style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       filled: true,
                       fillColor: Colors.grey[850],
                       hintText: 'Where to?',
                       hintStyle: TextStyle(color: Colors.grey[400]),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                       suffixIcon: _isLoading
-                          ? SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                          : Icon(Icons.search, color: Colors.white),
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Icon(Icons.search, color: Colors.white),
                     ),
                   ),
-
-                  //search suggestions
                   if (_suggestions.isNotEmpty)
                     Expanded(
                       child: Container(
-                        margin: EdgeInsets.only(top: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[850],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        margin: const EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(color: Colors.grey[850], borderRadius: BorderRadius.circular(12)),
                         child: ListView.builder(
                           shrinkWrap: true,
                           itemCount: _suggestions.length,
                           itemBuilder: (context, index) {
                             final suggestion = _suggestions[index];
                             return ListTile(
-                              title: Text(
-                                suggestion['placeName'] ?? '',
-                                style: TextStyle(color: Colors.white),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              title: Text(suggestion['placeName'] ?? '',
+                                  style: const TextStyle(color: Colors.white), maxLines: 2, overflow: TextOverflow.ellipsis),
                               onTap: () => _onSuggestionTap(suggestion),
                             );
                           },

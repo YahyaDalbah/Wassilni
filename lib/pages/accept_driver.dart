@@ -10,11 +10,10 @@ import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/pages/map.dart';
-
 import '../models/ride_model.dart';
 
 class AcceptDriverPage extends StatefulWidget {
-  final routeInfo; //from position_destination
+  final routeInfo;
 
   const AcceptDriverPage({Key? key, required this.routeInfo}) : super(key: key);
 
@@ -27,7 +26,6 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
   UserModel? _driver;
   Timer? _etaTimer;
   int _etaMinutes = 0;
-  bool _isLoading = true;
   StreamSubscription? _driverLocationSubscription;
   gl.Position? _currentPosition;
   DestinationProvider? _destinationProvider;
@@ -35,6 +33,8 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
   bool _isInitialized = false;
   bool _isMounted = false;
   StreamSubscription<DocumentSnapshot>? _rideSubscription;
+  List<String> _excludedDrivers = []; // List to track declined drivers
+  String? _currentRideId;
 
   @override
   void initState() {
@@ -50,7 +50,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
 
   void _initializeData() async {
     await _getCurrentPosition();
-    _findNearestDriver();
+    _findNearestDriver(_excludedDrivers); // Start with no excluded drivers
     _etaTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
       if (_isMounted) {
         _updateETA();
@@ -92,6 +92,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
     _etaTimer?.cancel();
     _driverLocationSubscription?.cancel();
+    _rideSubscription?.cancel();
     super.dispose();
   }
 
@@ -110,82 +111,57 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
     }
   }
 
-  Future<void> _findNearestDriver() async {
+  Future<void> _findNearestDriver(List<String> excludedDrivers) async {
     if (!_isMounted) return;
     try {
-      setState(() => _isLoading = true);
-
-      final QuerySnapshot driversSnapshot = await FirebaseFirestore.instance
+      // Fetch all online drivers
+      final driversSnapshot = await FirebaseFirestore.instance
           .collection('users')
           .where('type', isEqualTo: 'driver')
           .where('isOnline', isEqualTo: true)
           .get();
 
-      if (!_isMounted) return;
+      // Filter out excluded drivers and convert to list
+      final availableDrivers = driversSnapshot.docs
+          .map((doc) => UserModel.fromFireStore(doc))
+          .where((driver) => !excludedDrivers.contains(driver.id))
+          .toList();
 
-      if (driversSnapshot.docs.isEmpty || _currentPosition == null) {
+      if (availableDrivers.isEmpty || _currentPosition == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No drivers available or location unavailable')),
         );
-        setState(() => _isLoading = false);
         Future.delayed(const Duration(milliseconds: 1500), () {
           if (_isMounted) Navigator.pop(context);
         });
         return;
       }
 
-      UserModel? closestDriver;
-      num minDistance = double.infinity;
-
-      for (var doc in driversSnapshot.docs) {
-        final driver = UserModel.fromFireStore(doc);
-        final distance = gl.Geolocator.distanceBetween(
+      // Sort by distance
+      availableDrivers.sort((a, b) {
+        final distanceA = gl.Geolocator.distanceBetween(
           _currentPosition!.latitude,
           _currentPosition!.longitude,
-          driver.location.latitude,
-          driver.location.longitude,
+          a.location.latitude,
+          a.location.longitude,
         );
-        if (distance < minDistance) {
-          minDistance = distance;
-          closestDriver = driver;
-        }
-      }
-
-      if (closestDriver != null) {
-        _driver = closestDriver;
-        _listenToDriverLocation();
-        _updateETA();
-        await _createRide();
-        setState(() => _isLoading = false);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No drivers available at the moment')),
+        final distanceB = gl.Geolocator.distanceBetween(
+          _currentPosition!.latitude,
+          _currentPosition!.longitude,
+          b.location.latitude,
+          b.location.longitude,
         );
-        setState(() => _isLoading = false);
-        Future.delayed(const Duration(milliseconds: 1500), () {
-          if (_isMounted) Navigator.pop(context);
-        });
-      }
-    } catch (e) {
-      print("Error fetching nearest driver: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching driver: $e')),
-      );
-      setState(() => _isLoading = false);
-      Future.delayed(const Duration(seconds: 1), () {
-        if (_isMounted) Navigator.pop(context);
+        return distanceA.compareTo(distanceB);
       });
-    }
-  }
 
-  Future<void> _createRide() async {
-    if (!_isMounted || _currentUser == null || _driver == null || _rideProvider == null) return;
+      // Select the closest driver
+      final closestDriver = availableDrivers.first;
 
-    try {
+      // Create the ride
       final ride = Ride(
-        rideId: '', // Will be set by Firestore
+        rideId: _currentRideId ?? '',
         riderId: _currentUser!.id,
-        driverId: _driver!.id,
+        driverId: closestDriver.id,
         status: 'requested',
         pickup: {
           'coordinates': GeoPoint(_currentPosition!.latitude, _currentPosition!.longitude),
@@ -198,45 +174,88 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
         timestamps: {'requested': Timestamp.now()},
       );
 
-      final rideRef = await FirebaseFirestore.instance.collection('rides').add(ride.toMap());
-      final rideDoc = await rideRef.get();
-      _rideProvider!.setCurrentRide(Ride.fromFirestore(rideDoc));
-
-      _rideSubscription = FirebaseFirestore.instance
-        .collection('rides')
-        .doc(rideDoc.id)
-        .snapshots()
-        .listen((snapshot) async {
-      if (!_isMounted) return;
-      final updatedRide = Ride.fromFirestore(snapshot);
-      _rideProvider!.setCurrentRide(updatedRide);
-      if (updatedRide.status == 'in_progress') {
-        print("################################");
-        print("triggered");
-        final geoPoint = updatedRide.destination['coordinates'] as GeoPoint;
-        final newDestination = mp.Point(
-          coordinates: mp.Position(
-            geoPoint.longitude,
-            geoPoint.latitude,
-          ),
-        );
-        _destinationProvider!.destination = newDestination;
-        
-        Navigator.push(context, MaterialPageRoute(
-          builder: (context) => ToDestination(),
-        ));
+      if (_currentRideId == null) {
+        // Create new ride
+        final rideRef = await FirebaseFirestore.instance.collection('rides').add(ride.toMap());
+        _currentRideId = rideRef.id;
+        final rideDoc = await rideRef.get();
+        _rideProvider!.setCurrentRide(Ride.fromFirestore(rideDoc));
+      } else {
+        // Update existing ride with new driver
+        await FirebaseFirestore.instance.collection('rides').doc(_currentRideId).update({
+          'driverId': closestDriver.id,
+          'status': 'requested',
+        });
+        _rideProvider!.setCurrentRide(ride.copyWith(rideId: _currentRideId, driverId: closestDriver.id));
       }
-    });
+
+      // Set up listener if not already
+      if (_rideSubscription == null) {
+        _rideSubscription = FirebaseFirestore.instance
+            .collection('rides')
+            .doc(_currentRideId)
+            .snapshots()
+            .listen(_handleRideUpdate);
+      }
     } catch (e) {
-      print("Error creating ride: $e");
+      print("Error in _findNearestDriver: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error creating ride: $e')),
+        SnackBar(content: Text('Error finding driver: $e')),
       );
+      Future.delayed(const Duration(seconds: 1), () {
+        if (_isMounted) Navigator.pop(context);
+      });
+    }
+  }
+
+  void _handleRideUpdate(DocumentSnapshot snapshot) {
+    if (!snapshot.exists || !_isMounted) return;
+    final updatedRide = Ride.fromFirestore(snapshot);
+    _rideProvider!.setCurrentRide(updatedRide);
+
+    if (updatedRide.status == 'accepted') {
+      // Driver accepted, fetch driver details and update UI
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(updatedRide.driverId)
+          .get()
+          .then((driverDoc) {
+        if (_isMounted) {
+          setState(() {
+            _driver = UserModel.fromFireStore(driverDoc);
+          });
+          _listenToDriverLocation();
+          _updateETA();
+        }
+      });
+    } else if (updatedRide.status == 'declined') {
+      // Driver declined, mark driver and find next
+      setState(() {
+        _excludedDrivers.add(updatedRide.driverId);
+        _driver = null; // Clear current driver
+      });
+      _findNearestDriver(_excludedDrivers);
+    } else if (updatedRide.status == 'in_progress') {
+      print("################################");
+      print("triggered");
+      // Navigate to ToDestination
+      final geoPoint = updatedRide.destination['coordinates'] as GeoPoint;
+      final newDestination = mp.Point(
+        coordinates: mp.Position(
+          geoPoint.longitude,
+          geoPoint.latitude,
+        ),
+      );
+      _destinationProvider!.destination = newDestination;
+      Navigator.push(context, MaterialPageRoute(
+        builder: (context) => ToDestination(),
+      ));
     }
   }
 
   void _listenToDriverLocation() {
     if (_driver == null || !_isMounted) return;
+    _driverLocationSubscription?.cancel();
     _driverLocationSubscription = FirebaseFirestore.instance
         .collection('users')
         .doc(_driver!.id)
@@ -270,12 +289,17 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
         title: const Text('Cancel Ride?'),
         content: const Text('Are you sure you want to cancel this ride?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('NO')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('NO'),
+          ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               _cancelRide();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ride canceled')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Ride canceled')),
+              );
               Navigator.pop(context);
             },
             child: const Text('YES'),
@@ -313,7 +337,14 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Select Payment Method', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Select Payment Method',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.money, color: Colors.green),
@@ -337,155 +368,186 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    if (_isLoading || _driver == null) {
-      return Scaffold(
-        body: Stack(
-          children: [
-            const Map(),
-            Container(
-              color: Colors.black.withOpacity(0.7),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    return Scaffold(
+      body: Consumer<RideProvider>(
+        builder: (context, rideProvider, child) {
+          final currentRide = rideProvider.currentRide;
+          if (currentRide == null || currentRide.status == 'requested' || _driver == null) {
+            return _buildLoadingScreen();
+          } else if (currentRide.status == 'accepted' && _driver != null) {
+            return _buildDriverDetails();
+          } else {
+            return _buildLoadingScreen(); // Default to loading for other statuses
+          }
+        },
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return Stack(
+      children: [
+        const Map(),
+        Container(
+          color: Colors.black.withOpacity(0.7),
+          child: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(color: Colors.white),
+                SizedBox(height: 16),
+                Text(
+                  "Finding your driver...",
+                  style: TextStyle(color: Colors.white, fontSize: 18),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 50,
+          left: 16,
+          child: CircleAvatar(
+            backgroundColor: Colors.black54,
+            child: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDriverDetails() {
+    return Stack(
+      children: [
+        Consumer<DestinationProvider>(
+          builder: (context, destProvider, child) => const Map(),
+        ),
+        Positioned(
+          top: 200,
+          left: 100,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              "$_etaMinutes MIN\nETA",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+            decoration: const BoxDecoration(
+              color: Colors.black,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "YOUR DRIVER IS EN ROUTE...",
+                  style: TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 16),
-                    Text("Finding your driver...", style: TextStyle(color: Colors.white, fontSize: 18)),
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: Colors.grey,
+                      backgroundImage: _driver!.vehicle['photoUrl']?.isNotEmpty == true
+                          ? NetworkImage(_driver!.vehicle['photoUrl']!)
+                          : null,
+                      child: _driver!.vehicle['photoUrl']?.isEmpty != false
+                          ? const Icon(Icons.person, size: 30, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _driver!.vehicle['driver_name'] ?? 'Driver',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
+                          Text(
+                            _driver!.phone,
+                            style: const TextStyle(color: Colors.grey, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.white),
+                      ),
+                      child: Text(
+                        _driver!.vehicle['licensePlate'] ?? 'Unknown',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
                   ],
                 ),
-              ),
-            ),
-            Positioned(
-              top: 50,
-              left: 16,
-              child: CircleAvatar(
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text(
+                      "COST ",
+                      style: TextStyle(color: Colors.white, fontSize: 18),
+                    ),
+                    Consumer<RideProvider>(
+                      builder: (context, rideProvider, child) {
+                        final fare = rideProvider.currentRide?.fare ?? 0.0;
+                        return Text(
+                          "\$${fare.toStringAsFixed(1)}",
+                          style: const TextStyle(color: Colors.grey, fontSize: 20),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[800],
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: _selectPaymentMethod,
+                  child: const Text("Choose Payment Method"),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: _handleCancelRide,
+                  child: const Text(
+                    "Cancel Ride",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      );
-    }
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          Consumer<DestinationProvider>(builder: (context, destProvider, child) => const Map()),
-          Positioned(
-            top: 50,
-            left: 16,
-            child: CircleAvatar(
-              backgroundColor: Colors.black54,
-              child: IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 200,
-            left: 100,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
-              child: Text(
-                "$_etaMinutes MIN\nETA",
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("YOUR DRIVER IS EN ROUTE...", style: TextStyle(color: Colors.white70)),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 30,
-                        backgroundColor: Colors.grey,
-                        backgroundImage: _driver!.vehicle['photoUrl']?.isNotEmpty == true
-                            ? NetworkImage(_driver!.vehicle['photoUrl']!)
-                            : null,
-                        child: _driver!.vehicle['photoUrl']?.isEmpty != false
-                            ? const Icon(Icons.person, size: 30, color: Colors.white)
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _driver!.vehicle['driver_name'] ?? 'Driver',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                            ),
-                            Text(_driver!.phone, style: const TextStyle(color: Colors.grey, fontSize: 16)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(border: Border.all(color: Colors.white)),
-                        child: Text(_driver!.vehicle['licensePlate'] ?? 'Unknown', style: const TextStyle(color: Colors.white)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text("COST ", style: TextStyle(color: Colors.white, fontSize: 18)),
-                      Consumer<RideProvider>(
-                        builder: (context, rideProvider, child) {
-                          final fare = rideProvider.currentRide?.fare ?? 0.0;
-                          return Text(
-                            "\$${fare.toStringAsFixed(1)}",
-                            style: const TextStyle(color: Colors.grey, fontSize: 20),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[800],
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    onPressed: _selectPaymentMethod,
-                    child: const Text("Choose Payment Method"),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    onPressed: _handleCancelRide,
-                    child: const Text("Cancel Ride", style: TextStyle(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
