@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:wassilni/models/ride_model.dart';
+import 'package:wassilni/providers/fare_provider.dart';
 
 Widget buildPanelContent({
   required String panelTitle,
@@ -8,6 +11,7 @@ Widget buildPanelContent({
   required String panelLocation2,
   required VoidCallback onAcceptRide,
   required VoidCallback onCancelRide,
+
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -163,7 +167,7 @@ Widget buildDroppingOffPanel({
       children: [
         const SizedBox(height: 10),
         Text(
-          "Dropping Off $userName",
+          "Dropping Off Rider",
           style: const TextStyle(
             fontSize: 20,
             color: Colors.white,
@@ -186,7 +190,7 @@ Widget buildDroppingOffPanel({
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green, // Changed to green
             padding: const EdgeInsets.symmetric(vertical: 15),
-            fixedSize: const Size(300, 50), // Approximate 80% width for most screens
+            fixedSize: const Size(300, 60), // Approximate 80% width for most screens
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -225,11 +229,10 @@ Widget buildCollapsedPanel(String text) {
 class FooterWidget extends StatelessWidget {
   final String text;
 
-  const FooterWidget({required this.text, Key? key}) : super(key: key);
+  const FooterWidget({required this.text, super.key});
 
   @override
   Widget build(BuildContext context) {
-    print("FooterWidget built with text: $text");
     return Container(
       color: Colors.black,
       padding: const EdgeInsets.all(16),
@@ -306,5 +309,24 @@ Widget buildPickingUpFooter({
         ),
       ),
     ),
+  );
+}
+
+
+
+Widget buildDroppingOffPanels({
+  required Ride currentRide,
+  required BuildContext context,
+  required VoidCallback onCompleteRide,
+}) {
+  return Consumer<FareProvider>(
+    builder: (context, fareProvider, _) {
+      return buildDroppingOffPanel(
+        userName: "Rider ${currentRide.riderId}",
+        distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
+        estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
+        onCompleteRide: onCompleteRide,
+      );
+    },
   );
 }
