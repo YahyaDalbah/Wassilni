@@ -7,21 +7,29 @@ class RideHistoryService {
     required String userId,
     DocumentSnapshot? lastDocument,
   }) async {
-    Query query = _firestore
-        .collection('rides')
-        .where('riderId', isEqualTo: userId)
-        .orderBy('timestamps.requested', descending: true)
-        .limit(_pageSize);
+    try {
+      Query query = _firestore
+          .collection('rides')
+          .where('riderId', isEqualTo: userId)
+          .orderBy('timestamps.requested', descending: true)
+          .limit(_pageSize);
 
-    if (lastDocument != null) {
-      query = query.startAfterDocument(lastDocument);
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      final snapshot = await query.get();
+      return {
+        'success': true,
+        'rides': snapshot.docs,
+        'lastDocument': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        'hasMore': snapshot.docs.length == _pageSize,
+      };
+    } catch (e) {
+      return {
+        'success': false,
+        'error': 'Failed to load rides. Please try again later.',
+      };
     }
-
-    final snapshot = await query.get();
-    return {
-      'rides': snapshot.docs,
-      'lastDocument': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
-      'hasMore': snapshot.docs.length == _pageSize,
-    };
   }
 }
