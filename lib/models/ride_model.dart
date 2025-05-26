@@ -56,4 +56,29 @@ class Ride {
       'timestamps': timestamps,
     };
   }
-}
+
+  Ride copyWith({
+    String? rideId,
+    String? riderId,
+    String? driverId,
+    String? status,
+    Map<String, dynamic>? pickup,
+    Map<String, dynamic>? destination,
+    double? fare,
+    double? distance,
+    double? duration,
+    Map<String, dynamic>? timestamps,
+  }) {
+    return Ride(
+      rideId: rideId ?? this.rideId,
+      riderId: riderId ?? this.riderId,
+      driverId: driverId ?? this.driverId,
+      status: status ?? this.status,
+      pickup: pickup ?? this.pickup,
+      destination: destination ?? this.destination,
+      fare: fare ?? this.fare,
+      distance: distance ?? this.distance,
+      duration: duration ?? this.duration,
+      timestamps: timestamps ?? this.timestamps,
+    );
+  }}
