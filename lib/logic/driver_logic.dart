@@ -39,24 +39,21 @@ class DriverLogic {
     onStateChanged();
   }
 
-  void _startRideListener([bool forceNew = false]) {
-    if (_ridesSubscription != null && !forceNew) return;
+  void _startRideListener() {
     _ridesSubscription?.cancel();
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     final driverId = userProvider.currentUser?.id;
-    if (driverId == null) return;
-    bool initialDataProcessed = false;
     _ridesSubscription = FirebaseFirestore.instance
         .collection('rides')
         .where('driverId', isEqualTo: driverId)
         .where('status', isEqualTo: "requested")
         .snapshots(includeMetadataChanges: true)
         .listen((snapshot) async {
-          if (!initialDataProcessed) {
-            if (snapshot.metadata.isFromCache) return;
-            initialDataProcessed = true;
+         if (snapshot.metadata.isFromCache) {
+          debugPrint("Ride stream is from cache, skipping processing.");
+            return;
           }
-          for (final change in snapshot.docChanges) {
+        for (final change in snapshot.docChanges) {
             if (change.type == DocumentChangeType.added &&
                 !change.doc.metadata.hasPendingWrites) {
               currentRide = Ride.fromFirestore(change.doc);
@@ -69,9 +66,7 @@ class DriverLogic {
   }
 
   void _updateProvidersWithRideData(Ride ride) {
-    final destProvider = Provider.of<DestinationProvider>(context, listen: false);
-    final fareProvider = Provider.of<FareProvider>(context, listen: false);
-    final pickupPoint = mp.Point(
+      final pickupPoint = mp.Point(
       coordinates: mp.Position(
         ride.pickup["coordinates"].longitude,
         ride.pickup["coordinates"].latitude,
@@ -83,10 +78,10 @@ class DriverLogic {
         ride.destination["coordinates"].latitude,
       ),
     );
-    destProvider
+    Provider.of<DestinationProvider>(context, listen: false)
       ..pickup = pickupPoint
       ..destination = dropoffPoint;
-    fareProvider
+      Provider.of<FareProvider>(context, listen: false)
       ..estimatedDistance = ride.distance
       ..estimatedDuration = ride.duration
       ..estimatedFare = ride.fare;
@@ -104,17 +99,15 @@ class DriverLogic {
 
   Future<void> _calculateDistances() async {
     try {
-      if (driverState != DriverState.foundRide && driverState != DriverState.pickingUp) return;
+      if (driverState != DriverState.foundRide && driverState != DriverState.pickingUp && driverState!= DriverState.droppingOff) return;
       final currentPosition = await gl.Geolocator.getCurrentPosition();
-      final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
       final currentToPickup = gl.Geolocator.distanceBetween(
         currentPosition.latitude,
         currentPosition.longitude,
         currentRide!.pickup["coordinates"].latitude,
         currentRide!.pickup["coordinates"].longitude,
       ) / 1000;
-      destinationProvider.updateDistances(currentToPickup);
-      final fareProvider = Provider.of<FareProvider>(context, listen: false);
+      Provider.of<DestinationProvider>(context, listen: false).updateDistances(currentToPickup);
       final currentPoint = mp.Point(
         coordinates: mp.Position(
           currentPosition.longitude,
@@ -127,7 +120,7 @@ class DriverLogic {
           currentRide!.pickup["coordinates"].latitude,
         ),
       );
-      await fareProvider.updateCurrentToPickupDuration(currentPoint, pickupPoint);
+      await Provider.of<FareProvider>(context, listen: false).updateCurrentToPickupDuration(currentPoint, pickupPoint);
       if (driverState == DriverState.pickingUp && currentToPickup <= 0.040 && isMounted()) {
         transitionToWaiting();
       }
@@ -138,17 +131,13 @@ class DriverLogic {
   }
 
   void toggleOnlineStatus() async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
     if (driverState == DriverState.offline) {
-      await userProvider.updateOnlineStatus(true);
+      await Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(true);
       driverState = DriverState.lookingForRide;
-      _startRideListener(true);
+      _startRideListener();
       _calculateDistances();
       _startOnlineUpdates();
     } else if (driverState == DriverState.foundRide || driverState == DriverState.lookingForRide) {
-      await userProvider.updateOnlineStatus(false);
-      driverState = DriverState.offline;
-      _onlineDistanceTimer?.cancel();
       resetToDefault();
     }
   }
@@ -203,18 +192,13 @@ class DriverLogic {
   }
 
   void resetToDefault() {
-    final destinationProvider = Provider.of<DestinationProvider>(context, listen: false);
-    final fareProvider = Provider.of<FareProvider>(context, listen: false);
-    final userProvider = Provider.of<UserProvider>(context, listen: false);
-    userProvider.updateOnlineStatus(false);
+    Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(false);
+    Provider.of<DestinationProvider>(context, listen: false).clearAll();
+    Provider.of<FareProvider>(context, listen: false).clear();
     driverState = DriverState.offline;
-    destinationProvider.clearAll();
-    destinationProvider.clearDistances();
-    fareProvider.clear();
-    _ridesSubscription?.cancel();
     _ridesSubscription = null;
     currentRide = null;
-    destinationProvider.redrawRoute();
+    _ridesSubscription?.cancel();
     _onlineDistanceTimer?.cancel();
     _distanceUpdateTimer?.cancel();
     _waitTimer?.cancel();
@@ -242,7 +226,7 @@ class DriverLogic {
 
   bool get isCancelEnabled => _remainingWaitTime == 0;
 
-  void handleRideCancel() async {
+  void handleRideCancel() async { 
     if (!isMounted()) return;
 
     final context = this.context;
@@ -277,12 +261,10 @@ class DriverLogic {
   }
 
   void _performCancellation() {
-    Provider.of<RideProvider>(context, listen: false)
-      .updateRideStatus("canceled", currentRide!);
-    // Reset logic
+    Provider.of<RideProvider>(context, listen: false).updateRideStatus("canceled", currentRide!);
     Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(true);
     driverState = DriverState.lookingForRide;
-    _startRideListener(true);
+    _startRideListener();
     _calculateDistances();
     _startOnlineUpdates();
     currentRide = null;

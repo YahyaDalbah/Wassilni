@@ -49,7 +49,7 @@ Widget buildPanelContent({
       const Spacer(),
       Column(
         children: [
-          // Accept Ride Button (same as before)
+        
           ElevatedButton(
             onPressed: onAcceptRide,
             style: ElevatedButton.styleFrom(
@@ -66,7 +66,6 @@ Widget buildPanelContent({
             ),
           ),
           const SizedBox(height: 10),
-          // Cancel Button
           ElevatedButton(
             onPressed: onCancelRide,
             style: ElevatedButton.styleFrom(
@@ -92,8 +91,8 @@ Widget buildWaitingPanel({
   required String userName,
   required String waitTime,
   required VoidCallback onStartRide,
-  VoidCallback? onCancelRide, // Keep cancellation logic unchanged
-  required bool isCancelEnabled, // Pass enabled state
+  VoidCallback? onCancelRide, 
+  required bool isCancelEnabled, 
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -133,10 +132,10 @@ Widget buildWaitingPanel({
             ),
           ),
           ElevatedButton(
-            onPressed: isCancelEnabled ? onCancelRide : null, // Disable button if not enabled
+            onPressed: isCancelEnabled ? onCancelRide : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, // Enabled color
-              disabledBackgroundColor: const Color(0xFFCF8383), // Disabled color
+              backgroundColor: Colors.red, 
+              disabledBackgroundColor: const Color(0xFFCF8383), 
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -154,7 +153,6 @@ Widget buildWaitingPanel({
   );
 }
 
-// In driver_widgets.dart
 Widget buildDroppingOffPanel({
   required String userName,
   required String distance,
@@ -188,9 +186,9 @@ Widget buildDroppingOffPanel({
         ElevatedButton(
           onPressed: onCompleteRide,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green, // Changed to green
+            backgroundColor: Colors.green, 
             padding: const EdgeInsets.symmetric(vertical: 15),
-            fixedSize: const Size(300, 60), // Approximate 80% width for most screens
+            fixedSize: const Size(300, 60), 
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -246,7 +244,7 @@ class FooterWidget extends StatelessWidget {
   }
 }
 
-// Widgets for Online/Offline Toggle and Footers
+
 Widget buildOnlineOfflineButton({
   required VoidCallback onPressed,
   required bool isOnline,
@@ -275,14 +273,14 @@ Widget buildOnlineOfflineButton({
 Widget buildPickingUpFooter({
   required String userName,
   required String distanceText,
-  required VoidCallback onTap, // Add this parameter
+  required VoidCallback onTap,
 }) {
   return Positioned(
     bottom: 0,
     left: 0,
     right: 0,
     child: GestureDetector(
-      onTap: onTap, // Use the callback
+      onTap: onTap, 
       child: Container(
         height: 100,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
