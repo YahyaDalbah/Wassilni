@@ -228,7 +228,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
           _updateETA();
         }
       });
-    } else if (updatedRide.status == 'declined') {
+    } else if (updatedRide.status == 'canceled') {
       // Driver declined, mark driver and find next
       setState(() {
         _excludedDrivers.add(updatedRide.driverId);
@@ -246,6 +246,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
           geoPoint.latitude,
         ),
       );
+
       _destinationProvider!.destination = newDestination;
       Navigator.push(context, MaterialPageRoute(
         builder: (context) => ToDestination(),
@@ -387,7 +388,6 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
   Widget _buildLoadingScreen() {
     return Stack(
       children: [
-        const Map(),
         Container(
           color: Colors.black.withOpacity(0.7),
           child: const Center(
@@ -423,9 +423,8 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
   Widget _buildDriverDetails() {
     return Stack(
       children: [
-        Consumer<DestinationProvider>(
-          builder: (context, destProvider, child) => const Map(),
-        ),
+       const Map(),
+
         Positioned(
           top: 200,
           left: 100,

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:wassilni/models/ride_model.dart';
+import 'package:wassilni/providers/fare_provider.dart';
 
 Widget buildPanelContent({
   required String panelTitle,
@@ -8,6 +11,7 @@ Widget buildPanelContent({
   required String panelLocation2,
   required VoidCallback onAcceptRide,
   required VoidCallback onCancelRide,
+
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -45,7 +49,7 @@ Widget buildPanelContent({
       const Spacer(),
       Column(
         children: [
-          // Accept Ride Button (same as before)
+        
           ElevatedButton(
             onPressed: onAcceptRide,
             style: ElevatedButton.styleFrom(
@@ -62,7 +66,6 @@ Widget buildPanelContent({
             ),
           ),
           const SizedBox(height: 10),
-          // Cancel Button
           ElevatedButton(
             onPressed: onCancelRide,
             style: ElevatedButton.styleFrom(
@@ -88,8 +91,8 @@ Widget buildWaitingPanel({
   required String userName,
   required String waitTime,
   required VoidCallback onStartRide,
-  VoidCallback? onCancelRide, // Keep cancellation logic unchanged
-  required bool isCancelEnabled, // Pass enabled state
+  VoidCallback? onCancelRide, 
+  required bool isCancelEnabled, 
 }) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.center,
@@ -129,10 +132,10 @@ Widget buildWaitingPanel({
             ),
           ),
           ElevatedButton(
-            onPressed: isCancelEnabled ? onCancelRide : null, // Disable button if not enabled
+            onPressed: isCancelEnabled ? onCancelRide : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red, // Enabled color
-              disabledBackgroundColor: const Color(0xFFCF8383), // Disabled color
+              backgroundColor: Colors.red, 
+              disabledBackgroundColor: const Color(0xFFCF8383), 
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -150,7 +153,6 @@ Widget buildWaitingPanel({
   );
 }
 
-// In driver_widgets.dart
 Widget buildDroppingOffPanel({
   required String userName,
   required String distance,
@@ -163,7 +165,7 @@ Widget buildDroppingOffPanel({
       children: [
         const SizedBox(height: 10),
         Text(
-          "Dropping Off $userName",
+          "Dropping Off Rider",
           style: const TextStyle(
             fontSize: 20,
             color: Colors.white,
@@ -184,9 +186,9 @@ Widget buildDroppingOffPanel({
         ElevatedButton(
           onPressed: onCompleteRide,
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green, // Changed to green
+            backgroundColor: Colors.green, 
             padding: const EdgeInsets.symmetric(vertical: 15),
-            fixedSize: const Size(300, 50), // Approximate 80% width for most screens
+            fixedSize: const Size(300, 60), 
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -225,11 +227,10 @@ Widget buildCollapsedPanel(String text) {
 class FooterWidget extends StatelessWidget {
   final String text;
 
-  const FooterWidget({required this.text, Key? key}) : super(key: key);
+  const FooterWidget({required this.text, super.key});
 
   @override
   Widget build(BuildContext context) {
-    print("FooterWidget built with text: $text");
     return Container(
       color: Colors.black,
       padding: const EdgeInsets.all(16),
@@ -243,7 +244,7 @@ class FooterWidget extends StatelessWidget {
   }
 }
 
-// Widgets for Online/Offline Toggle and Footers
+
 Widget buildOnlineOfflineButton({
   required VoidCallback onPressed,
   required bool isOnline,
@@ -272,14 +273,14 @@ Widget buildOnlineOfflineButton({
 Widget buildPickingUpFooter({
   required String userName,
   required String distanceText,
-  required VoidCallback onTap, // Add this parameter
+  required VoidCallback onTap,
 }) {
   return Positioned(
     bottom: 0,
     left: 0,
     right: 0,
     child: GestureDetector(
-      onTap: onTap, // Use the callback
+      onTap: onTap, 
       child: Container(
         height: 100,
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
@@ -306,5 +307,24 @@ Widget buildPickingUpFooter({
         ),
       ),
     ),
+  );
+}
+
+
+
+Widget buildDroppingOffPanels({
+  required Ride currentRide,
+  required BuildContext context,
+  required VoidCallback onCompleteRide,
+}) {
+  return Consumer<FareProvider>(
+    builder: (context, fareProvider, _) {
+      return buildDroppingOffPanel(
+        userName: "Rider ${currentRide.riderId}",
+        distance: "${((fareProvider.estimatedDistance ?? 0) / 1000).toStringAsFixed(1)} KM",
+        estTimeLeft: "${(fareProvider.estimatedDuration ?? 0) ~/ 60} min",
+        onCompleteRide: onCompleteRide,
+      );
+    },
   );
 }
