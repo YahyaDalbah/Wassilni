@@ -10,6 +10,7 @@ import 'package:wassilni/pages/map.dart';
 import 'package:wassilni/pages/rides_history.dart';
 import 'package:wassilni/pages/rider_screen.dart';
 
+
 class ToDestination extends StatefulWidget {
   const ToDestination({super.key});
 
@@ -102,6 +103,7 @@ class _ToDestinationState extends State<ToDestination> {
             onPressed: () {
               Navigator.pop(context);
               Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const RiderScreen()));
+
             },
             child: const Text('OK'),
           ),

@@ -246,6 +246,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
           geoPoint.latitude,
         ),
       );
+
       _destinationProvider!.destination = newDestination;
       Navigator.push(context, MaterialPageRoute(
         builder: (context) => ToDestination(),
@@ -398,6 +399,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
                 Text(
                   "Finding your driver...",
                   style: TextStyle(color: Colors.white, fontSize: 18),
+
                 ),
               ],
             ),
@@ -422,6 +424,7 @@ class _AcceptDriverPageState extends State<AcceptDriverPage> with WidgetsBinding
     return Stack(
       children: [
        const Map(),
+
         Positioned(
           top: 200,
           left: 100,
