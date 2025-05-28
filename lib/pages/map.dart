@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -107,6 +108,24 @@ class _Map extends State<Map> {
   }
 
   Future<void> _fitCameraToBounds() async {
+    bool serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      _showError('Location services are disabled. Please enable them.');
+      return;
+    }
+    gl.LocationPermission permission = await gl.Geolocator.checkPermission();
+    if (permission == gl.LocationPermission.denied) {
+      permission = await gl.Geolocator.requestPermission();
+      if (permission == gl.LocationPermission.denied) {
+        _showError('Location services are denied. Please enable them.');
+        return;
+      }
+    }
+    if (permission == gl.LocationPermission.deniedForever) {
+      _showError('Location services are permenantly denied. Please enable them in settings.');
+      return;
+    }
     var currentPosition = await gl.Geolocator.getCurrentPosition();
     if (mapboxMap == null || _destinationProvider.destination == null) return;
 
@@ -207,7 +226,11 @@ class _Map extends State<Map> {
     await _locationService.updateUserPosition(user.id, currentPosition);
 
     createMarker(destination);
-    }catch(e){
+    }
+    on SocketException catch (e) {
+      _showError('No internet connection. Failed to draw route.');
+    }
+    catch(e){
       _showError('Failed to initialize route: $e');
     }
   }
@@ -252,24 +275,6 @@ class _Map extends State<Map> {
   }
 
   Future<void> _setupPositionTracking() async {
-    bool serviceEnabled;
-    gl.LocationPermission permission;
-
-    serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
-
-    if (!serviceEnabled) {
-      return Future.error("Location services are disabled");
-    }
-    permission = await gl.Geolocator.checkPermission();
-    if (permission == gl.LocationPermission.denied) {
-      permission = await gl.Geolocator.requestPermission();
-      if (permission == gl.LocationPermission.denied) {
-        return Future.error("Location permissions are denied");
-      }
-    }
-    if (permission == gl.LocationPermission.deniedForever) {
-      return Future.error("Location permissions are permanently denied");
-    }
     gl.LocationSettings locationSettings = gl.LocationSettings(
       accuracy: gl.LocationAccuracy.high,
       distanceFilter: 100,
@@ -282,7 +287,14 @@ class _Map extends State<Map> {
       if (mapboxMap != null && _destinationProvider.destination != null) {
         _updatePositionAndRoute(position);
         //driver update
-        await _locationService.updateUserPosition(user.id, position);
+        try{
+          await _locationService.updateUserPosition(user.id, position);
+        }on SocketException{
+          _showError("Bad internet Connection");
+        }
+        catch(e){
+          _showError('$e');
+        }
       }
     });
   }
@@ -326,7 +338,11 @@ class _Map extends State<Map> {
           ),
         ],
       );
-    } catch (e) {
+    } on SocketException{
+      _showError('Failed to update route: Bad internet connection');
+    }
+    
+     catch (e) {
       _showError('Failed to update route: $e');
     }
   }
@@ -360,7 +376,7 @@ class _Map extends State<Map> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 6),
       ),
     );
   }
@@ -379,23 +395,6 @@ class _Map extends State<Map> {
                     onStyleLoadedListener: _onStyleLoadedCallback,
                     cameraOptions: _initialCameraOptions,
                   ),
-                  if (_errorMessage != null)
-                    Positioned(
-                      top: 30,
-                      child: Material(
-                        color: Colors.red[100],
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.error, color: Colors.red),
-                              const SizedBox(width: 8),
-                              Text(_errorMessage!),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
                 ],
               ),
     );

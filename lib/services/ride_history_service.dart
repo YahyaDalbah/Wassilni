@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RideHistoryService {
@@ -25,7 +27,14 @@ class RideHistoryService {
         'lastDocument': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
         'hasMore': snapshot.docs.length == _pageSize,
       };
-    } catch (e) {
+    }on SocketException{
+      return {
+        'success': false,
+        'error': 'Failed to load rides. Check internet connection.',
+      };
+    }
+    
+     catch (e) {
       return {
         'success': false,
         'error': 'Failed to load rides. Please try again later.',

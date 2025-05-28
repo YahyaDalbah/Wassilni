@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
@@ -20,6 +21,44 @@ class _HomePageState extends State<HomePage> {
   final TextEditingController _controller = TextEditingController();
   final List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void initState(){
+    super.initState();
+    _requestLocationPermission();
+  }
+  void _requestLocationPermission() async{
+    bool serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
+
+    if (!serviceEnabled) {
+      _showError('Location services are disabled. Please enable them.');
+      return;
+    }
+    gl.LocationPermission permission = await gl.Geolocator.checkPermission();
+    if (permission == gl.LocationPermission.denied) {
+      permission = await gl.Geolocator.requestPermission();
+      if (permission == gl.LocationPermission.denied) {
+        _showError("Location services are denied. Please enable them. You won't be able to use the app without them");
+        return;
+      }
+    }
+    if (permission == gl.LocationPermission.deniedForever) {
+      _showError('Location services are permenantly denied. Please enable them in settings.');
+      return;
+    }
+  }
+  void _showError(String message) {
+    if (!mounted) return;
+    setState(() => _errorMessage = message);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 6),
+      ),
+    );
+  }
 
   Future<void> _searchPlaces(String query) async {
     if (query.length < 3) {

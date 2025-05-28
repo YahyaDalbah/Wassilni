@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
@@ -10,7 +11,7 @@ class FirebaseLocationService {
   void startTrackingDriver(
     String driverId,
     void Function(mp.Point driverPoint) onUpdate, {
-    Function(Object error)? onError,
+    required Function(Object error) onError,
   }) {
     try {
       _driverLocationSub = _firestore
@@ -34,11 +35,14 @@ class FirebaseLocationService {
               onUpdate(driverPoint);
             },
             onError: (error) {
-              if (onError != null) onError(error);
+              onError(error);
             },
           );
-    } catch (e) {
-      if (onError != null) onError(e);
+    } on SocketException {
+      onError("bad network connection");
+    }
+     catch (e) {
+      onError(e);
     }
   }
 
@@ -48,7 +52,11 @@ class FirebaseLocationService {
         'location': GeoPoint(position.latitude, position.longitude),
       });
       
-    } catch (e) {
+    }on SocketException {
+      rethrow;
+    } 
+    
+    catch (e) {
       throw Exception('failed to update user in cloud');
     }
   }

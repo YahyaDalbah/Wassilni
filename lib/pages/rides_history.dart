@@ -23,7 +23,6 @@ class _RidesHistoryState extends State<RidesHistory>
   bool _hasMore = true;
   String? _errorMessage;
   late UserModel user;
-  final int _pageSize = 5;
 
   @override
   void initState() {
@@ -115,7 +114,7 @@ class _RidesHistoryState extends State<RidesHistory>
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
-        duration: const Duration(seconds: 3),
+        duration: const Duration(seconds: 6),
       ),
     );
   }
