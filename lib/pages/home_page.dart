@@ -9,6 +9,9 @@ import 'package:wassilni/pages/position_destination.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+import 'dart:io'; // For SocketException
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,15 +25,36 @@ class _HomePageState extends State<HomePage> {
   final List<Map<String, dynamic>> _suggestions = [];
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isOnline = true;
+  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
 
   @override
-  void initState(){
+  void initState() {
     super.initState();
     _requestLocationPermission();
+    _checkConnectivity();
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
   }
-  void _requestLocationPermission() async{
-    bool serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
 
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkConnectivity() async {
+    var connectivityResult = await Connectivity().checkConnectivity();
+    _updateConnectionStatus(connectivityResult);
+  }
+
+  void _updateConnectionStatus(ConnectivityResult result) {
+    setState(() {
+      _isOnline = result != ConnectivityResult.none;
+    });
+  }
+
+  void _requestLocationPermission() async {
+    bool serviceEnabled = await gl.Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       _showError('Location services are disabled. Please enable them.');
       return;
@@ -39,15 +63,16 @@ class _HomePageState extends State<HomePage> {
     if (permission == gl.LocationPermission.denied) {
       permission = await gl.Geolocator.requestPermission();
       if (permission == gl.LocationPermission.denied) {
-        _showError("Location services are denied. Please enable them. You won't be able to use the app without them");
+        _showError("Location services are denied. Please enable them to use the app.");
         return;
       }
     }
     if (permission == gl.LocationPermission.deniedForever) {
-      _showError('Location services are permenantly denied. Please enable them in settings.');
+      _showError('Location services are permanently denied. Please enable them in settings.');
       return;
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     setState(() => _errorMessage = message);
@@ -61,6 +86,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _searchPlaces(String query) async {
+    if (!_isOnline) {
+      _showError('You are offline. Please check your internet connection.');
+      return;
+    }
     if (query.length < 3) {
       setState(() => _suggestions.clear());
       return;
@@ -79,9 +108,15 @@ class _HomePageState extends State<HomePage> {
             'coordinates': f['geometry']['coordinates'],
           }));
         });
+      } else {
+        _showError('Sorry, we couldn’t fetch suggestions right now. Please try again later.');
       }
     } catch (e) {
-      print('Error searching places: $e');
+      if (e is SocketException) {
+        _showError('You are offline. Please check your internet connection.');
+      } else {
+        _showError('Something went wrong while searching. Please try again later.');
+      }
     } finally {
       setState(() => _isLoading = false);
     }
