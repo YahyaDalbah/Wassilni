@@ -64,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      String cleanPhoneNumber = phoneNumber.trim();
+      String cleanPhoneNumber = '+${phoneNumber.trim()}';
       if (!cleanPhoneNumber.startsWith('+')) {
         cleanPhoneNumber = '+$cleanPhoneNumber';
       }
