@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
+import 'package:wassilni/pages/profile_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/home_page.dart';
@@ -77,7 +78,7 @@ class _MyAppState extends State<MyApp> {
             listen: false,
           );
           return userProvider.currentUser != null
-              ? userProvider.currentUser!.type.name == "rider" ? const RiderScreen() : DriverMap()
+              ? userProvider.currentUser!.type.name == "rider" ? const ProfilePage() : DriverMap()
               : const RegisterPage();
         },
       ),

@@ -1,12 +1,9 @@
-import 'dart:math';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:country_picker/country_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:wassilni/models/user_model.dart';
-import 'package:wassilni/pages/Component/input_field.dart';
+import 'package:wassilni/helpers/register_functions_handler.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
-import 'package:wassilni/pages/auth/verify_phone_page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+
+import 'package:wassilni/widgets/register_widgets/confirm_button_widget.dart';
+import 'package:wassilni/widgets/register_widgets/form_field_widget.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -31,96 +28,6 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-  Future<void> _handleSmsTimeout(String phoneNumber) async {
-    if (_lastSmsTime != null) {
-      final difference = DateTime.now().difference(_lastSmsTime!);
-      if (difference.inSeconds < 60) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Please wait ${60 - difference.inSeconds} seconds before trying again'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
-      }
-    }
-  }
-
-  void _handleVerificationFailed(FirebaseAuthException e) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Verification failed: ${e.message}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  void _handleCodeSent(String verificationId, String phoneNumber) {
-    _lastSmsTime = DateTime.now();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verification code sent successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VerifyPhonePage(
-            verificationId: verificationId,
-            phoneNumber: phoneNumber,
-            password: _passwordController.text,
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> _handleVerificationCompleted(PhoneAuthCredential credential, String phoneNumber) async {
-    await _addUserToFirestore(phoneNumber, _passwordController.text);
-    await FirebaseAuth.instance.signInWithCredential(credential);
-  }
-
-  Future<void> _registerWithPhoneNumber() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
-    final phoneNumber = _selectedCountryCode + _phoneController.text.trim();
-    await _handleSmsTimeout(phoneNumber);
-    
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
-        verificationCompleted: (credential) => _handleVerificationCompleted(credential, phoneNumber),
-        verificationFailed: _handleVerificationFailed,
-        codeSent: (verificationId, resendToken) => _handleCodeSent(verificationId, phoneNumber),
-        codeAutoRetrievalTimeout: (String verificationId) {},
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
 
    _buildAppBar() {
     return AppBar(
@@ -134,103 +41,20 @@ class _RegisterPageState extends State<RegisterPage> {
       shadowColor: Colors.white30,
     );
   }
+  Future<void> _registerWithPhoneNumber() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  Widget _buildPhoneNumberField() {
-    return Row(
-      children: [
-        Text(
-          _selectedCountryFlag,
-          style: TextStyle(fontSize: 24),
-        ),
-        IconButton(
-          onPressed: () {
-            showCountryPicker(
-              context: context,
-              showPhoneCode: true,
-              onSelect: (Country country) {
-                setState(() {
-                  _selectedCountryCode = '+${country.phoneCode}';
-                  _selectedCountryFlag = country.flagEmoji;
-                });
-              },
-            );
-          },
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
-        ),
-        Expanded(
-          child: InputField(
-            controller: _phoneController,
-            validate: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter your phone number';
-              }
-              if(value.length < 8 || value.length > 10){
-                return "The number must be between 8 - 10 digits";
-              }
-              return null;
-            },
-            text: "Phone Number ",
-            prefixText: _selectedCountryCode,
-            keyboardType: TextInputType.phone,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFormFields() {
-    return Column(
-      children: [
-        _buildPhoneNumberField(),
-        SizedBox(height: 20),
-        InputField(
-          controller: _passwordController,
-          validate: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter password';
-            }
-            if (value.length < 6) {
-              return 'Password must be at least 6 characters';
-            }
-            return null;
-          },
-          text: "Password ",
-          obscureText: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildConfirmButton() {
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: 20),
-      child: ElevatedButton(
-        onPressed: _isLoading ? null : _registerWithPhoneNumber,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          minimumSize: Size(300, 50),
-          textStyle: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        child: _isLoading 
-          ? SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                color: Colors.white,
-                strokeWidth: 2,
-              ),
-            )
-          : Text("Confirm"),
-      ),
-    );
+    setState(() => _isLoading = true);
+    
+    try {
+      await RegisterFunctionsHandler().registerWithPhoneNumber(
+        phoneNumber: _selectedCountryCode + _phoneController.text,
+        password: _passwordController.text,
+        context: context,
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -262,7 +86,10 @@ class _RegisterPageState extends State<RegisterPage> {
                           ),
                         ),
                         SizedBox(height: 30),
-                        _buildFormFields(),
+                        BuildFormFields(
+                          phoneController: _phoneController,
+                          passwordController: _passwordController,
+                        ),
                         SizedBox(height: 20),
                         TextButton(
                           style: TextButton.styleFrom(
@@ -282,7 +109,10 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 ),
-                _buildConfirmButton(),
+                ConfirmButtonWidget(
+                  isLoading: _isLoading,
+                  onPressed: _registerWithPhoneNumber,
+                ),
               ],
             ),
           ),
@@ -292,20 +122,4 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 }
 
-Future<void> _addUserToFirestore(String phoneNumber,String password) async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user != null) {
-    await UserModel.addToFireStore(
-      type: UserType.rider,
-      password: password ,
-      phone: phoneNumber,
-      isOnline: true,
-      vehicle: {
-        "make": "",
-        "model": "",
-        "licensePlate": ""
-      },
-      location: const GeoPoint(0, 0),
-    );
-  }
-}
+
