@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/firebase_options.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
@@ -78,7 +79,7 @@ class _MyAppState extends State<MyApp> {
           );
           return userProvider.currentUser != null
               ? userProvider.currentUser!.type.name == "rider" ? const RiderScreen() : DriverMap()
-              : const RegisterPage();
+              : const LoginPage();
         },
       ),
     );

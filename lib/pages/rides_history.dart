@@ -17,6 +17,7 @@ class RidesHistory extends StatefulWidget {
 class _RidesHistoryState extends State<RidesHistory>
     with WidgetsBindingObserver {
   final RideHistoryService _rideService = RideHistoryService();
+  int? _lastActiveIndex;
   List<QueryDocumentSnapshot> _rides = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
