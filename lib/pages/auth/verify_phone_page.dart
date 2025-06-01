@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:crypto/crypto.dart';
+import 'package:wassilni/helpers/code_verification_handler.dart';
 import 'dart:convert';
-import 'package:wassilni/services/auth_service.dart';
+import 'package:wassilni/services/verification_service.dart';
 import '../rider_screen.dart';
+import 'package:wassilni/widgets/verification/verification_app_bar.dart';
+import 'package:wassilni/widgets/verification/verification_header.dart';
+import 'package:wassilni/widgets/verification/verify_button.dart';
 
 class VerifyPhonePage extends StatefulWidget {
   final String verificationId;
@@ -25,12 +29,27 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
   late List<FocusNode> _focusNodes;
   late List<TextEditingController> _controllers;
   bool _isLoading = false;
+  late final CodeVerificationHandler _codeVerificationHandler;
+  final _verificationService = VerificationService();
 
   @override
   void initState() {
+    super.initState();
     _focusNodes = List.generate(6, (_) => FocusNode());
     _controllers = List.generate(6, (_) => TextEditingController());
-    super.initState();
+    _codeVerificationHandler = CodeVerificationHandler(
+      context: context,
+      verificationService: _verificationService,
+      verificationId: widget.verificationId,
+      phoneNumber: widget.phoneNumber,
+      password: widget.password,
+      setLoading: (value) => setState(() => _isLoading = value),
+    );
+  }
+
+  void _checkValidateOfCode() async {
+    final enteredCode = _controllers.map((item) => item.text).join();
+    await _codeVerificationHandler.validateCode(enteredCode);
   }
 
   @override
@@ -57,100 +76,23 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
     return hash.toString();
   }
 
-  void _checkValidateOfCode() async {
-    if (_controllers.any((controller) => controller.text.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete verification code'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-    setState(() {
-      _isLoading = true;
-    });
-
-    String enteredCode = _controllers.map((item) => item.text).join();
-    try {
-      final authService = AuthService();
-      await authService.verifyPhoneCode(
-        verificationId: widget.verificationId,
-        smsCode: enteredCode,
-      );
-      
-      await authService.createUserInFirestore(
-        phoneNumber: widget.phoneNumber,
-        password: widget.password,
-      );
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Phone number verified successfully'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const RiderScreen()),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Verification failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white10,
-      appBar: AppBar(
-        title: const Text(
-          "Phone Verification",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.black,
-        centerTitle: true,
-        elevation: 2.6,
-        shadowColor: Colors.white,
-      ),
+      appBar: const VerificationAppBar(),
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             children: [
-              const SizedBox(height: 100),
-              const Text(
-                "Enter the 6-digit code sent to your phone",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 30),
+              const VerificationHeader(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(6, (index) {
                   return Container(
                     width: 30,
-                    margin: EdgeInsets.symmetric(horizontal: 8),
+                    margin: const EdgeInsets.symmetric(horizontal: 8),
                     child: KeyboardListener(
                       focusNode: FocusNode(),
                       onKeyEvent: (KeyEvent event) {
@@ -166,24 +108,20 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
                         decoration: const InputDecoration(
                           contentPadding: EdgeInsets.symmetric(vertical: 10),
                           enabledBorder: UnderlineInputBorder(
-                            borderSide: BorderSide(color: Colors.white54),
+                            borderSide: BorderSide(color: Colors.white),
                           ),
                           focusedBorder: UnderlineInputBorder(
                             borderSide: BorderSide(color: Colors.white),
                           ),
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
                         ),
                         keyboardType: TextInputType.number,
                         inputFormatters: [
                           LengthLimitingTextInputFormatter(1),
                           FilteringTextInputFormatter.digitsOnly,
                         ],
+                        style: const TextStyle(color: Colors.white),
                         onChanged: (value) {
-                          if (value.isNotEmpty &&
-                              index < _focusNodes.length - 1) {
+                          if (value.isNotEmpty && index < 5) {
                             _focusNodes[index + 1].requestFocus();
                           }
                         },
@@ -193,31 +131,9 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
                 }),
               ),
               const Spacer(),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _checkValidateOfCode,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(300, 50),
-                    textStyle: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text("Verify"),
-                ),
+              VerifyButton(
+                isLoading: _isLoading,
+                onPressed: _checkValidateOfCode,
               ),
             ],
           ),
