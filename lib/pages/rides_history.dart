@@ -130,7 +130,23 @@ class _RidesHistoryState extends State<RidesHistory>
         elevation: 0,
       ),
       backgroundColor: Colors.black,
-      body: _buildBody(),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth > 1000) {
+            return GridView.builder(
+              itemCount: _rides.length,
+              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: MediaQuery.of(context).size.width * 0.5,
+              ),
+              itemBuilder: (context, index) {
+                return _buildListItem(index);
+              },
+            );
+          } else {
+            return _buildBody();
+          }
+        },
+      ),
     );
   }
 
