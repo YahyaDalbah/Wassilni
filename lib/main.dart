@@ -9,6 +9,7 @@ import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
+import 'package:wassilni/pages/profile_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/pages/home_page.dart';

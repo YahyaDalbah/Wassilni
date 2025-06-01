@@ -18,24 +18,28 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> login(String phone, String password) async {
+    String cleanPhoneNumber = phone.trim();
+    if (!cleanPhoneNumber.startsWith('+')) {
+      cleanPhoneNumber = '+$cleanPhoneNumber';
+    }
 
     final querySnapshot = await FirebaseFirestore.instance
         .collection('users')
-        .where('phone', isEqualTo: phone)
+        .where('phone', isEqualTo: cleanPhoneNumber)
         .get();
 
     if (querySnapshot.docs.isNotEmpty) {
       final userDoc = querySnapshot.docs.first;
       _currentUser = UserModel.fromFireStore(userDoc);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('logged_in_phone', phone);
+      await prefs.setString('logged_in_phone', cleanPhoneNumber);
       await prefs.setString('user_id', userDoc.id);
       
       notifyListeners();
     } else {
       throw Exception('No user found with this phone number');
     }
-  }
+}
 
   Future<bool> initializeFromStorage() async {
     final prefs = await SharedPreferences.getInstance();

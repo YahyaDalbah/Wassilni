@@ -1,15 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
-
-import 'package:wassilni/pages/home_page.dart';
-import 'package:wassilni/models/user_model.dart';
+import 'package:wassilni/services/auth_service.dart';
 import '../rider_screen.dart';
-
 
 class VerifyPhonePage extends StatefulWidget {
   final String verificationId;
@@ -79,23 +73,15 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
 
     String enteredCode = _controllers.map((item) => item.text).join();
     try {
-      PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      final authService = AuthService();
+      await authService.verifyPhoneCode(
         verificationId: widget.verificationId,
         smsCode: enteredCode,
       );
-
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
-      await UserModel.addToFireStore(
-        type: UserType.rider,
-        phone: widget.phoneNumber,
-        password: _hashPassword(widget.password), // Add hashed password
-        isOnline: true,
-        vehicle: {
-          "make": "",
-          "model": "",
-          "licensePlate": ""
-        },
-        location: const GeoPoint(0, 0),
+      
+      await authService.createUserInFirestore(
+        phoneNumber: widget.phoneNumber,
+        password: widget.password,
       );
       
       if (mounted) {
