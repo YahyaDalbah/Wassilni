@@ -73,6 +73,7 @@ class BuildLoginForm extends StatelessWidget {
               return null;
             },
           ),
+          SizedBox(height: 42),
         ],
       ),
     );
