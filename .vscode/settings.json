@@ -1,0 +1,6 @@
+{
+    "cmake.ignoreCMakeListsMissing": true,
+    "java.project.sourcePaths": [
+        "lib/widgets"
+    ]
+}

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "861154114146",
+    "project_id": "wassilni-7c51f",
+    "storage_bucket": "wassilni-7c51f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:861154114146:android:1f66e9feb0689a1de3af3b",
+        "android_client_info": {
+          "package_name": "com.example.wassilni"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvJwpKe3akyRJfnPKy0Zclb7P0toRAkHo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
