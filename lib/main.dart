@@ -1,18 +1,14 @@
-import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/firebase_options.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
-import 'package:wassilni/pages/auth/register_page.dart';
 import 'package:wassilni/pages/driver_page.dart';
-import 'package:wassilni/pages/profile_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
-import 'package:wassilni/pages/home_page.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'pages/rider_screen.dart';

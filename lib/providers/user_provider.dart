@@ -2,7 +2,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider extends ChangeNotifier {
