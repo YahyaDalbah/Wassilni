@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-Widget buildPickingUpFooter({
+Widget pickingUpFooter({
   required String userName,
   required String distanceText,
   required VoidCallback onTap,

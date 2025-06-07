@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-Widget foundRidePanel({
+Widget foundRideSlidingPanel({
   required String panelTitle,
   required String panelSubtitle1,
   required String panelSubtitle2,

@@ -21,18 +21,22 @@ enum DriverState {
 
 class DriverLogic {
   final BuildContext context;
-  final VoidCallback onStateChanged;
   final bool Function() isMounted;
   final UserProvider userProvider;
   final DestinationProvider destinationProvider;
   final FareProvider fareProvider;
   final RideProvider rideProvider;
 
+  // Add setStateCallback property
+  VoidCallback? setStateCallback;
+  // Keep onStateChanged for compatibility
+  late final VoidCallback onStateChanged;
+
   DriverState _driverState = DriverState.offline;
   DriverState get driverState => _driverState;
   set driverState(DriverState value) {
     _driverState = value;
-    onStateChanged(); // Missing notification
+    onStateChanged(); // This will now use setStateCallback if available
   }
 
   Ride? _currentRide;
@@ -42,14 +46,25 @@ class DriverLogic {
   Timer? _waitTimer;
   int _remainingWaitTime = 7;
 
-  DriverLogic(this.context, this.onStateChanged, this.isMounted)
-    : userProvider = Provider.of<UserProvider>(context, listen: false),
-      destinationProvider = Provider.of<DestinationProvider>(
-        context,
-        listen: false,
-      ),
-      fareProvider = Provider.of<FareProvider>(context, listen: false),
-      rideProvider = Provider.of<RideProvider>(context, listen: false) {
+  // Modified constructor to accept optional callback
+  DriverLogic(
+    this.context, [
+    VoidCallback? stateCallback,
+    bool Function()? isMountedCheck,
+  ]) : isMounted = isMountedCheck ?? (() => true),
+       userProvider = Provider.of<UserProvider>(context, listen: false),
+       destinationProvider = Provider.of<DestinationProvider>(
+         context,
+         listen: false,
+       ),
+       fareProvider = Provider.of<FareProvider>(context, listen: false),
+       rideProvider = Provider.of<RideProvider>(context, listen: false) {
+    // Setup callback system
+    setStateCallback = stateCallback;
+    onStateChanged = () {
+      setStateCallback?.call();
+    };
+
     userProvider.updateOnlineStatus(false);
   }
 
@@ -71,6 +86,7 @@ class DriverLogic {
 
   void transitionToLookingForRide() {
     userProvider.updateOnlineStatus(true);
+    print("is the user online? ${userProvider.currentUser?.isOnline}");
     driverState = DriverState.lookingForRide;
     _startRideListener();
     _startOnlineUpdates();
@@ -322,6 +338,15 @@ class DriverLogic {
       ..redrawRoute();
   }
 
+  resetProvidersForCancellation() {
+    userProvider.updateOnlineStatus(true);
+    fareProvider.clear();
+    destinationProvider
+      ..clearAll()
+      ..clearDistances()
+      ..redrawRoute();
+  }
+
   cancelAllActiveOperations() {
     _ridesSubscription?.cancel();
     _onlineDistanceTimer?.cancel();
@@ -336,7 +361,7 @@ class DriverLogic {
   void _performCancellation() {
     rideProvider.updateRideStatus("canceled", currentRide!);
     currentRide = null;
-    resetproviders();
+    resetProvidersForCancellation();
     transitionToLookingForRide();
   }
 

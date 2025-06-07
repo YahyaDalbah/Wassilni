@@ -1,23 +1,27 @@
 import 'dart:async';
-
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:wassilni/pages/auth/login_page.dart';
+import 'package:wassilni/pages/driver_history.dart';
 import 'package:wassilni/pages/map.dart';
+import 'package:wassilni/pages/driver_profile_page.dart';
+import 'package:wassilni/pages/rider_history.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
 import 'package:wassilni/logic/driver_logic.dart';
-import 'package:wassilni/widgets/driver_widgets/closed_panel.dart';
-import 'package:wassilni/widgets/driver_widgets/dropping_off_panel.dart';
+import 'package:wassilni/widgets/driver_widgets/collapsed_panel.dart';
+import 'package:wassilni/widgets/driver_widgets/dropping_off_sliding_panel.dart';
 import 'package:wassilni/widgets/driver_widgets/footer_widget.dart';
-import 'package:wassilni/widgets/driver_widgets/found_ride_panel.dart';
-import 'package:wassilni/widgets/driver_widgets/online_offline_button.dart';
+import 'package:wassilni/widgets/driver_widgets/found_ride_sliding_panel.dart';
+import 'package:wassilni/widgets/driver_widgets/go_stop_button.dart';
 import 'package:wassilni/widgets/driver_widgets/picking_up_footer.dart';
-import 'package:wassilni/widgets/driver_widgets/waitingPanel.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:wassilni/widgets/driver_widgets/menu_drawer.dart';
+import 'package:wassilni/widgets/driver_widgets/waiting_sliding_panel.dart';
+import 'package:wassilni/utils/snackbar_utils.dart';
 
 class DriverMap extends StatefulWidget {
   const DriverMap({super.key});
@@ -30,88 +34,61 @@ class _DriverMapState extends State<DriverMap> {
   late final DriverLogic _logic;
   late final PanelController _foundRideController;
   late final PanelController _waitingController;
-  late StreamSubscription<ConnectivityResult> _connectivitySubscription;
+  late final ConnectivityService _connectivityService;
   bool _isConnected = true;
-  Timer? _snackbarTimer;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _isDrawerOpen = false;
+  final double _drawerHeightPercentage = 0.1;
+  final SnackbarUtils _snackbarUtils = SnackbarUtils();
 
-  @override
-  void initState() {
-    super.initState();
+  void _initializePanelControllers(DriverLogic logic) {
+    // Initialize controllers
     _foundRideController = PanelController();
     _waitingController = PanelController();
-    _logic = DriverLogic(context, () {
+
+    // Set up state change handler
+    logic.setStateCallback = () {
       if (mounted) setState(() {});
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_logic.driverState == DriverState.foundRide &&
+        if (logic.driverState == DriverState.foundRide &&
             _foundRideController.isAttached) {
           _foundRideController.open();
-        } else if (_logic.driverState == DriverState.waiting &&
+        } else if (logic.driverState == DriverState.waiting &&
             _waitingController.isAttached) {
           _waitingController.open();
         }
       });
-    }, () => mounted);
-    _logic.transitionToOffline();
-    _startConnectivityMonitoring();
+    };
   }
 
-  void _startConnectivityMonitoring() {
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((
-      result,
-    ) {
-      final isConnected = result != ConnectivityResult.none;
-      if (isConnected) {
-        _showConnectionRestoredSnackbar();
-      } else {
-        _showConnectionLostSnackbar();
-      }
-      if (mounted) {
-        setState(() {
-          _isConnected = isConnected;
-        });
-      }
-    });
-  }
-
-  void _showTopSnackbar(String message, Color color, int seconds) {
-    _snackbarTimer?.cancel();
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        duration: Duration(seconds: seconds),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.only(top: 40, left: 10, right: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+  @override
+  void initState() {
+    super.initState();
+    Provider.of<UserProvider>(context, listen: false).updateOnlineStatus(false);
+    _logic = DriverLogic(
+      context,
+      null, // We'll set callback later
+      () => mounted,
     );
 
-    _snackbarTimer = Timer(Duration(seconds: seconds), () {
-      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    _initializePanelControllers(_logic);
+
+    // Initialize connectivity service
+    _connectivityService = ConnectivityService(snackbarUtils: _snackbarUtils);
+    _connectivityService.monitorConnection(context, (isConnected) {
+      if (mounted) setState(() => _isConnected = isConnected);
     });
-  }
-
-  void _showConnectionLostSnackbar() {
-    _showTopSnackbar('No internet connection', Colors.red, 5);
-  }
-
-  void _showConnectionRestoredSnackbar() {
-    _showTopSnackbar('Internet connection restored', Colors.green, 3);
   }
 
   void _handleButtonAction(VoidCallback action) {
-    if (!_isConnected) {
-      _showConnectionLostSnackbar();
-      return;
-    }
-    action();
+    _connectivityService.handleNetworkAction(context, _isConnected, action);
   }
 
   @override
   void dispose() {
-    _connectivitySubscription.cancel();
-    _snackbarTimer?.cancel();
+    _connectivityService.dispose(); // ADD THIS
+    _snackbarUtils.dispose(); // Add this
     _logic.dispose();
     super.dispose();
   }
@@ -143,13 +120,24 @@ class _DriverMapState extends State<DriverMap> {
   String get _panelLocation2 =>
       _logic.currentRide?.destination["address"] ?? 'Loading...';
 
+  void _openDrawer() {
+    setState(() => _isDrawerOpen = true);
+  }
+
+  void _closeDrawer() {
+    setState(() => _isDrawerOpen = false);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return SafeArea(
       child: Scaffold(
+        key: _scaffoldKey,
         body: Stack(
           children: [
-            // Map
+            // Map (always visible)
             Positioned.fill(
               child: Consumer<DestinationProvider>(
                 builder:
@@ -158,38 +146,89 @@ class _DriverMapState extends State<DriverMap> {
               ),
             ),
 
-            // Logout Button (only when offline)
-            if (_logic.driverState == DriverState.offline)
-              Positioned(
-                top: 40,
-                left: 20,
+            // Semi-transparent overlay when drawer is open
+            if (_isDrawerOpen)
+              GestureDetector(
+                onTap: _closeDrawer,
                 child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: IconButton(
-                    iconSize: 30,
-                    icon: const Icon(Icons.logout, color: Colors.white),
-                    onPressed: () async {
-                      await Provider.of<UserProvider>(
-                        context,
-                        listen: false,
-                      ).logout();
-                      if (mounted) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
-                        );
-                      }
-                    },
-                  ),
+                  color: Colors.black.withOpacity(0.5),
+                  width: screenWidth,
+                  height: double.infinity,
                 ),
               ),
 
+            // Top sliding drawer (AnimatedPositioned)
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+              top:
+                  _isDrawerOpen
+                      ? 0
+                      : -MediaQuery.of(context).size.height *
+                          _drawerHeightPercentage,
+              left: 0,
+              right: 0,
+              height:
+                  MediaQuery.of(context).size.height * _drawerHeightPercentage,
+              child: MenuDrawerContent(
+                onProfile: () {
+                  _closeDrawer();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DriverProfilePage(),
+                    ),
+                  );
+                },
+                onRides: () {
+                  _closeDrawer();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const DriverHistory()),
+                  );
+                },
+                onLogout: () async {
+                  _closeDrawer();
+                  await Provider.of<UserProvider>(
+                    context,
+                    listen: false,
+                  ).logout();
+                  if (mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    );
+                  }
+                },
+                onClose: _closeDrawer,
+              ),
+            ),
+
+            // Hamburger menu button (always menu icon, no close icon)
+            Positioned(
+              top: 40,
+              left: 20,
+              child: Visibility(
+                visible: !_isDrawerOpen, // Only visible when drawer closed
+                child: IgnorePointer(
+                  ignoring: _isDrawerOpen, // Block interaction when drawer open
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.menu, color: Colors.white),
+                      onPressed: _openDrawer, // Only opens drawer
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             // Online/Offline Toggle Button
             if (_logic.driverState.index <= DriverState.foundRide.index)
-              onlineOfflineButton(
+              goStopButton(
                 onPressed: () => _handleButtonAction(_logic.toggleOnlineStatus),
                 isOnline: _logic.driverState != DriverState.offline,
               ),
@@ -207,7 +246,7 @@ class _DriverMapState extends State<DriverMap> {
                         top: Radius.circular(20),
                       ),
                       color: Colors.black,
-                      panel: foundRidePanel(
+                      panel: foundRideSlidingPanel(
                         panelTitle: _panelTitle(),
                         panelSubtitle1: _panelSubtitle1(context),
                         panelSubtitle2: _panelSubtitle2(),
@@ -233,7 +272,7 @@ class _DriverMapState extends State<DriverMap> {
                       distance <= 0.1
                           ? '${(distance * 1000).round()} m'
                           : '${distance.toStringAsFixed(1)} km';
-                  return buildPickingUpFooter(
+                  return pickingUpFooter(
                     userName: "Rider",
                     distanceText: distanceText,
                     onTap:
@@ -253,7 +292,7 @@ class _DriverMapState extends State<DriverMap> {
                   top: Radius.circular(20),
                 ),
                 color: Colors.black,
-                panel: waitingPanel(
+                panel: waitingSlidingPanel(
                   userName: "Rider",
                   waitTime: _logic.formatWaitTime(),
                   onStartRide:
@@ -279,7 +318,7 @@ class _DriverMapState extends State<DriverMap> {
                   top: Radius.circular(20),
                 ),
                 color: Colors.black,
-                panel: droppingOffPanel(
+                panel: droppingOffSlidingPanel(
                   currentRide: _logic.currentRide!,
                   context: context,
                   onCompleteRide:

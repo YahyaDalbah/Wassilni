@@ -5,7 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/user_provider.dart';
-import 'package:wassilni/services/ride_history_service.dart';
+import 'package:wassilni/services/rider_history_service.dart';
 
 class RidesHistory extends StatefulWidget {
   const RidesHistory({super.key});

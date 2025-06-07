@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:wassilni/models/ride_model.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 
-Widget droppingOffPanel({
+Widget droppingOffSlidingPanel({
   required BuildContext context,
   required Ride currentRide,
   required VoidCallback onCompleteRide,

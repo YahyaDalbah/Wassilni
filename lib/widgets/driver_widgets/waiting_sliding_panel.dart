@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-Widget waitingPanel({
+Widget waitingSlidingPanel({
   required String userName,
   required String waitTime,
   required VoidCallback onStartRide,

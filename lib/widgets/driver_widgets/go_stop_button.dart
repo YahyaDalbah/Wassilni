@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 
-Widget onlineOfflineButton({
-  required VoidCallback onPressed,
-  required bool isOnline,
-}) {
+Widget goStopButton({required VoidCallback onPressed, required bool isOnline}) {
   return Positioned(
     bottom: 100,
     left: 0,
