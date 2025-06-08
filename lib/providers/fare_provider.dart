@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:wassilni/helpers/directions_handler.dart';
@@ -44,15 +42,19 @@ class FareProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateCurrentToPickupDuration(Point current, Point pickup) async {
+  Future<void> updateCurrentToPickupDuration(
+    Point current,
+    Point pickup,
+  ) async {
     try {
       _currentToPickupDuration = await getRouteDuration(current, pickup);
-            notifyListeners();
+      notifyListeners();
     } catch (e) {
       _currentToPickupDuration = null;
     }
   }
-void clear() {
+
+  void clear() {
     _estimatedFare = null;
     _estimatedDuration = null;
     _estimatedDistance = null;

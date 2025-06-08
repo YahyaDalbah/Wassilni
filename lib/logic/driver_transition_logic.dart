@@ -5,10 +5,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as gl;
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mp;
 import 'package:wassilni/models/ride_model.dart';
+import 'package:wassilni/pages/auth/login_page.dart';
 import 'package:wassilni/providers/destination_provider.dart';
 import 'package:wassilni/providers/fare_provider.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/providers/user_provider.dart';
+import 'package:wassilni/utils/format_utils.dart';
 
 enum DriverState {
   offline,
@@ -19,24 +21,20 @@ enum DriverState {
   droppingOff,
 }
 
-class DriverLogic {
+class DriverTransitioningLogic {
   final BuildContext context;
   final bool Function() isMounted;
   final UserProvider userProvider;
   final DestinationProvider destinationProvider;
   final FareProvider fareProvider;
   final RideProvider rideProvider;
-
-  // Add setStateCallback property
   VoidCallback? setStateCallback;
-  // Keep onStateChanged for compatibility
   late final VoidCallback onStateChanged;
-
   DriverState _driverState = DriverState.offline;
   DriverState get driverState => _driverState;
   set driverState(DriverState value) {
     _driverState = value;
-    onStateChanged(); // This will now use setStateCallback if available
+    onStateChanged();
   }
 
   Ride? _currentRide;
@@ -44,10 +42,8 @@ class DriverLogic {
   Timer? _distanceUpdateTimer;
   Timer? _onlineDistanceTimer;
   Timer? _waitTimer;
-  int _remainingWaitTime = 7;
-
-  // Modified constructor to accept optional callback
-  DriverLogic(
+  double _remainingWaitTime = 7.0;
+  DriverTransitioningLogic(
     this.context, [
     VoidCallback? stateCallback,
     bool Function()? isMountedCheck,
@@ -59,13 +55,10 @@ class DriverLogic {
        ),
        fareProvider = Provider.of<FareProvider>(context, listen: false),
        rideProvider = Provider.of<RideProvider>(context, listen: false) {
-    // Setup callback system
     setStateCallback = stateCallback;
     onStateChanged = () {
       setStateCallback?.call();
     };
-
-    userProvider.updateOnlineStatus(false);
   }
 
   Ride? get currentRide => _currentRide;
@@ -86,7 +79,6 @@ class DriverLogic {
 
   void transitionToLookingForRide() {
     userProvider.updateOnlineStatus(true);
-    print("is the user online? ${userProvider.currentUser?.isOnline}");
     driverState = DriverState.lookingForRide;
     _startRideListener();
     _startOnlineUpdates();
@@ -116,7 +108,7 @@ class DriverLogic {
 
   void transitionToWaiting() {
     driverState = DriverState.waiting;
-    _remainingWaitTime = 7;
+    _remainingWaitTime = 7.0;
     _waitTimer?.cancel();
     _waitTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!isMounted()) return;
@@ -250,12 +242,12 @@ class DriverLogic {
   Future<void> _calculateDistances() async {
     try {
       final currentPosition = await gl.Geolocator.getCurrentPosition();
-      final currentToPickupDistanceKm = _calculateDistanceToPickup(
+      final currentToPickupDistanceMeters = _calculateDistanceToPickup(
         currentPosition,
       );
-      _updateDistanceProviders(currentPosition, currentToPickupDistanceKm);
+      _updateDistanceProviders(currentPosition, currentToPickupDistanceMeters);
 
-      if (_ifIAmCloseTransitionToWaiting(currentToPickupDistanceKm)) {
+      if (_ifIAmCloseTransitionToWaiting(currentToPickupDistanceMeters)) {
         transitionToWaiting();
       }
     } catch (e) {
@@ -266,19 +258,18 @@ class DriverLogic {
 
   double _calculateDistanceToPickup(gl.Position currentPosition) {
     return gl.Geolocator.distanceBetween(
-          currentPosition.latitude,
-          currentPosition.longitude,
-          currentRide!.pickup["coordinates"].latitude,
-          currentRide!.pickup["coordinates"].longitude,
-        ) /
-        1000;
+      currentPosition.latitude,
+      currentPosition.longitude,
+      currentRide!.pickup["coordinates"].latitude,
+      currentRide!.pickup["coordinates"].longitude,
+    );
   }
 
   void _updateDistanceProviders(
     gl.Position currentPosition,
-    double distanceKm,
+    double distanceMeters,
   ) {
-    destinationProvider.updateDistances(distanceKm);
+    destinationProvider.updateDistances(distanceMeters);
 
     final currentPoint = mp.Point(
       coordinates: mp.Position(
@@ -297,12 +288,11 @@ class DriverLogic {
     fareProvider.updateCurrentToPickupDuration(currentPoint, pickupPoint);
   }
 
-  bool _ifIAmCloseTransitionToWaiting(double distanceKm) {
-    // Transition state if close to pickup point
-    return driverState == DriverState.pickingUp && distanceKm <= 0.040;
+  bool _ifIAmCloseTransitionToWaiting(double distanceMeters) {
+    // Transition state if close to pickup point (40 meters)
+    return driverState == DriverState.pickingUp && distanceMeters <= 40.0;
   }
 
-  //
   void toggleOnlineStatus() {
     if (driverState == DriverState.offline) {
       transitionToLookingForRide();
@@ -321,9 +311,7 @@ class DriverLogic {
         currentRide!.destination["coordinates"].latitude,
         currentRide!.destination["coordinates"].longitude,
       );
-      destinationProvider.updateCurrentToDropoffDistance(
-        currentToDropoff / 1000,
-      );
+      destinationProvider.updateCurrentToDropoffDistance(currentToDropoff);
     } catch (e, stackTrace) {
       debugPrint("Failed to update dropoff distance: $e\n$stackTrace");
     }
@@ -338,7 +326,7 @@ class DriverLogic {
       ..redrawRoute();
   }
 
-  resetProvidersForCancellation() {
+  resetProvidersButRemainOnlineForCancellation() {
     userProvider.updateOnlineStatus(true);
     fareProvider.clear();
     destinationProvider
@@ -355,17 +343,52 @@ class DriverLogic {
   }
 
   String formatWaitTime() {
-    return "0:${_remainingWaitTime.toString().padLeft(2, '0')}";
+    return "${_remainingWaitTime.formatDuration()}";
   }
 
   void _performCancellation() {
     rideProvider.updateRideStatus("canceled", currentRide!);
     currentRide = null;
-    resetProvidersForCancellation();
+    resetProvidersButRemainOnlineForCancellation();
     transitionToLookingForRide();
   }
 
   void dispose() {
     transitionToOffline();
+  }
+
+  void handleLogout() async {
+    final context = this.context;
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Logout?'),
+            content: const Text('Are you sure you want to logout?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('NO'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('YES'),
+              ),
+            ],
+          ),
+    );
+
+    if (confirmed ?? false) {
+      transitionToOffline();
+      await Provider.of<UserProvider>(context, listen: false).logout();
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginPage()),
+        );
+      }
+    }
   }
 }

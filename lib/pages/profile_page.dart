@@ -48,7 +48,7 @@ class ProfilePage extends StatelessWidget {
       });
     } catch (e) {
       debugPrint('Error calculating fare total: $e');
-      return 0.0; // Return 0 if there's an error
+      return 0.0; // Return 0 if there's an error to avoid breaking the UI
     }
   }
 

@@ -35,7 +35,7 @@ class SnackbarUtils {
   }
 
   void showConnectionRestored(BuildContext context) {
-    _showTopSnackbar(context, 'Internet connection restored', Colors.green, 3);
+    _showTopSnackbar(context, 'You are connected now', Colors.green, 3);
   }
 
   void dispose() {
@@ -57,9 +57,9 @@ class ConnectivityService {
       result,
     ) {
       final isConnected = result != ConnectivityResult.none;
-      if (isConnected) {
+      if (isConnected && context.mounted) {
         snackbarUtils.showConnectionRestored(context);
-      } else {
+      } else if (context.mounted) {
         snackbarUtils.showConnectionLost(context);
       }
       updateConnectionState(isConnected);

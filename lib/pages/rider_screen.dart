@@ -2,7 +2,7 @@ import "package:flutter/material.dart";
 
 import "package:wassilni/pages/home_page.dart";
 import "package:wassilni/pages/profile_page.dart";
-import "package:wassilni/pages/rides_history.dart";
+import "package:wassilni/pages/rider_history.dart";
 
 class RiderScreen extends StatefulWidget {
   const RiderScreen({super.key});

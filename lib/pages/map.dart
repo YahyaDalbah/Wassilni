@@ -123,7 +123,9 @@ class _Map extends State<Map> {
       }
     }
     if (permission == gl.LocationPermission.deniedForever) {
-      _showError('Location services are permenantly denied. Please enable them in settings.');
+      _showError(
+        'Location services are permenantly denied. Please enable them in settings.',
+      );
       return;
     }
     var currentPosition = await gl.Geolocator.getCurrentPosition();
@@ -181,56 +183,54 @@ class _Map extends State<Map> {
   }
 
   Future<void> _initializeRoute() async {
-    try{
+    try {
       var destination = _destinationProvider.destination!;
-    var currentPosition = await gl.Geolocator.getCurrentPosition();
-    var origin = mp.Point(
-      coordinates: mp.Position(
-        currentPosition.longitude,
-        currentPosition.latitude,
-      ),
-    );
+      var currentPosition = await gl.Geolocator.getCurrentPosition();
+      var origin = mp.Point(
+        coordinates: mp.Position(
+          currentPosition.longitude,
+          currentPosition.latitude,
+        ),
+      );
 
-    var routeData = await getDirectionsRoute(origin, destination);
-    var featureCollection = routeData["featureCollection"];
-    var distance = routeData["estimatedDistance"];
-    var duration = routeData["estimatedDuration"];
+      var routeData = await getDirectionsRoute(origin, destination);
+      var featureCollection = routeData["featureCollection"];
+      var distance = routeData["estimatedDistance"];
+      var duration = routeData["estimatedDuration"];
 
-    if (mounted) {
-      if (ride == null) {
-        var estimatedFare = routeData["estimatedFare"];
-        Provider.of<FareProvider>(context, listen: false).estimatedFare =
-            estimatedFare;
+      if (mounted) {
+        if (ride == null) {
+          var estimatedFare = routeData["estimatedFare"];
+          Provider.of<FareProvider>(context, listen: false).estimatedFare =
+              estimatedFare;
+        }
+        Provider.of<FareProvider>(context, listen: false).estimatedDistance =
+            distance;
+        Provider.of<FareProvider>(context, listen: false).estimatedDuration =
+            duration;
       }
-      Provider.of<FareProvider>(context, listen: false).estimatedDistance =
-          distance;
-      Provider.of<FareProvider>(context, listen: false).estimatedDuration =
-          duration;
-    }
 
-    await mapboxMap?.style.addSource(
-      mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
-    );
+      await mapboxMap?.style.addSource(
+        mp.GeoJsonSource(id: "route", data: json.encode(featureCollection)),
+      );
 
-    await mapboxMap?.style.addLayer(
-      mp.LineLayer(
-        id: "route_layer",
-        sourceId: "route",
-        lineJoin: mp.LineJoin.ROUND,
-        lineCap: mp.LineCap.ROUND,
-        lineColor: Colors.purple.value,
-        lineWidth: 6.0,
-      ),
-    );
-    //driver update
-    await _locationService.updateUserPosition(user.id, currentPosition);
+      await mapboxMap?.style.addLayer(
+        mp.LineLayer(
+          id: "route_layer",
+          sourceId: "route",
+          lineJoin: mp.LineJoin.ROUND,
+          lineCap: mp.LineCap.ROUND,
+          lineColor: Colors.purple.value,
+          lineWidth: 6.0,
+        ),
+      );
+      //driver update
+      await _locationService.updateUserPosition(user.id, currentPosition);
 
-    createMarker(destination);
-    }
-    on SocketException catch (e) {
+      createMarker(destination);
+    } on SocketException catch (e) {
       _showError('No internet connection. Failed to draw route.');
-    }
-    catch(e){
+    } catch (e) {
       _showError('Failed to initialize route: $e');
     }
   }
@@ -287,12 +287,11 @@ class _Map extends State<Map> {
       if (mapboxMap != null && _destinationProvider.destination != null) {
         _updatePositionAndRoute(position);
         //driver update
-        try{
+        try {
           await _locationService.updateUserPosition(user.id, position);
-        }on SocketException{
+        } on SocketException {
           _showError("Bad internet Connection");
-        }
-        catch(e){
+        } catch (e) {
           _showError('$e');
         }
       }
@@ -338,11 +337,9 @@ class _Map extends State<Map> {
           ),
         ],
       );
-    } on SocketException{
+    } on SocketException {
       _showError('Failed to update route: Bad internet connection');
-    }
-    
-     catch (e) {
+    } catch (e) {
       _showError('Failed to update route: $e');
     }
   }

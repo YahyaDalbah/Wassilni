@@ -7,9 +7,7 @@ import 'package:wassilni/models/ride_model.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/ride_provider.dart';
 import 'package:wassilni/pages/map.dart';
-import 'package:wassilni/pages/rides_history.dart';
 import 'package:wassilni/pages/rider_screen.dart';
-
 
 class ToDestination extends StatefulWidget {
   const ToDestination({super.key});
@@ -36,22 +34,33 @@ class _ToDestinationState extends State<ToDestination> {
     final rideProvider = Provider.of<RideProvider>(context, listen: false);
     _currentRide = rideProvider.currentRide;
     if (_currentRide == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No current ride found')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No current ride found')));
       Navigator.pop(context);
       return;
     }
     _driver = await _fetchDriverData();
     _setupRideStatusListener();
     _setupDriverLocationListener();
-    _etaTimer = Timer.periodic(const Duration(seconds: 15), (_) => _updateETA());
+    _etaTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _updateETA(),
+    );
   }
 
   Future<UserModel?> _fetchDriverData() async {
     try {
-      final driverDoc = await FirebaseFirestore.instance.collection('users').doc(_currentRide!.driverId).get();
+      final driverDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(_currentRide!.driverId)
+              .get();
       return driverDoc.exists ? UserModel.fromFireStore(driverDoc) : null;
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading driver data: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading driver data: $e')));
       return null;
     }
   }
@@ -62,8 +71,9 @@ class _ToDestinationState extends State<ToDestination> {
         .doc(_currentRide!.rideId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists && snapshot.data()?['status'] == 'completed') _showRideCompletedDialog();
-    });
+          if (snapshot.exists && snapshot.data()?['status'] == 'completed')
+            _showRideCompletedDialog();
+        });
   }
 
   void _setupDriverLocationListener() {
@@ -72,11 +82,11 @@ class _ToDestinationState extends State<ToDestination> {
         .doc(_currentRide!.driverId)
         .snapshots()
         .listen((snapshot) {
-      if (snapshot.exists) {
-        _driver?.location = snapshot.data()!['location'] as GeoPoint;
-        _updateETA();
-      }
-    });
+          if (snapshot.exists) {
+            _driver?.location = snapshot.data()!['location'] as GeoPoint;
+            _updateETA();
+          }
+        });
   }
 
   Future<void> _updateETA() async {
@@ -88,27 +98,36 @@ class _ToDestinationState extends State<ToDestination> {
       destination.latitude,
       destination.longitude,
     );
-    setState(() => _etaMinutes = ((distance / 8.33) / 60).ceil().clamp(1, double.infinity).toInt());
+    setState(
+      () =>
+          _etaMinutes =
+              ((distance / 8.33) / 60).ceil().clamp(1, double.infinity).toInt(),
+    );
   }
 
   void _showRideCompletedDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Ride Completed'),
-        content: const Text('Your ride has been completed.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const RiderScreen()));
-
-            },
-            child: const Text('OK'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Ride Completed'),
+            content: const Text('Your ride has been completed.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const RiderScreen(),
+                    ),
+                  );
+                },
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -122,7 +141,8 @@ class _ToDestinationState extends State<ToDestination> {
 
   @override
   Widget build(BuildContext context) {
-    if (_driver == null || _currentRide == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_driver == null || _currentRide == null)
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     return Scaffold(
       body: Stack(
         children: [
@@ -132,7 +152,10 @@ class _ToDestinationState extends State<ToDestination> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               margin: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: Colors.black.withOpacity(0.85), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: Row(
                 children: [
                   const SizedBox(width: 12),
@@ -141,9 +164,28 @@ class _ToDestinationState extends State<ToDestination> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Car Info', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text(_driver!.vehicle['model'] ?? 'Unknown', style: TextStyle(color: Colors.grey[300], fontSize: 14)),
-                        Text(_driver!.vehicle['licensePlate'] ?? 'Unknown', style: TextStyle(color: Colors.grey[300], fontSize: 14)),
+                        const Text(
+                          'Car Info',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          _driver!.vehicle['model'] ?? 'Unknown',
+                          style: TextStyle(
+                            color: Colors.grey[300],
+                            fontSize: 14,
+                          ),
+                        ),
+                        Text(
+                          _driver!.vehicle['licensePlate'] ?? 'Unknown',
+                          style: TextStyle(
+                            color: Colors.grey[300],
+                            fontSize: 14,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -151,9 +193,21 @@ class _ToDestinationState extends State<ToDestination> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('$_etaMinutes min', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                      Text('\$${_currentRide!.fare.toStringAsFixed(2)}',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(
+                        '$_etaMinutes min',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        '\$${_currentRide!.fare.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
                     ],
                   ),
                 ],

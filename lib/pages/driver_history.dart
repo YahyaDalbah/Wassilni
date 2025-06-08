@@ -1,4 +1,3 @@
-// driver_rides_history.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -282,7 +281,9 @@ class _DriverRidesHistoryState extends State<DriverHistory>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         /* _buildDetailRow('Passenger:', ride['riderName'] ?? 'Unknown'),
-        const SizedBox(height: 8),*/
+        const SizedBox(height: 8),
+        I could have included the passenger's phone here as well, what a shame,
+        */
         _buildDetailRow('From:', ride['pickup']['address'] ?? 'Unknown'),
         const SizedBox(height: 8),
         _buildDetailRow('To:', ride['destination']['address'] ?? 'Unknown'),

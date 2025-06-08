@@ -18,8 +18,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   String _selectedCountryCode = '+970';
-  String _selectedCountryFlag = '🇵🇸';
-  DateTime? _lastSmsTime;
+  /*String _selectedCountryFlag = '🇵🇸';
+  DateTime? _lastSmsTime;*/
 
   @override
   void dispose() {
@@ -28,8 +28,7 @@ class _RegisterPageState extends State<RegisterPage> {
     super.dispose();
   }
 
-
-   _buildAppBar() {
+  _buildAppBar() {
     return AppBar(
       title: Text(
         "Register Page",
@@ -41,11 +40,12 @@ class _RegisterPageState extends State<RegisterPage> {
       shadowColor: Colors.white30,
     );
   }
+
   Future<void> _registerWithPhoneNumber() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
-    
+
     try {
       await RegisterFunctionsHandler().registerWithPhoneNumber(
         phoneNumber: _selectedCountryCode + _phoneController.text,
@@ -93,16 +93,22 @@ class _RegisterPageState extends State<RegisterPage> {
                         SizedBox(height: 20),
                         TextButton(
                           style: TextButton.styleFrom(
-                            textStyle: TextStyle(decoration: TextDecoration.underline),
+                            textStyle: TextStyle(
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                           onPressed: () {
                             Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (context) => LoginPage())
+                              MaterialPageRoute(
+                                builder: (context) => LoginPage(),
+                              ),
                             );
                           },
                           child: Text(
                             "Do you have account?",
-                            style: TextStyle(decoration: TextDecoration.underline),
+                            style: TextStyle(
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ],
@@ -121,5 +127,3 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 }
-
-

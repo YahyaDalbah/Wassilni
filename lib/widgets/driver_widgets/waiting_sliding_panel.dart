@@ -33,34 +33,44 @@ Widget waitingSlidingPanel({
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          ElevatedButton(
-            onPressed: onStartRide,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Material(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: onStartRide,
+              borderRadius: BorderRadius.circular(8),
+              splashColor: Colors.white.withOpacity(0.5),
+              highlightColor: Colors.white.withOpacity(0.3),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 24,
+                ),
+                child: const Text(
+                  "Start Ride",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-            ),
-            child: const Text(
-              "Start Ride",
-              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
-          ElevatedButton(
-            onPressed: isCancelEnabled ? onCancelRide : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              disabledBackgroundColor: const Color(0xFFCF8383),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          Material(
+            color: isCancelEnabled ? Colors.red : const Color(0xFFCF8383),
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              onTap: isCancelEnabled ? onCancelRide : null,
+              borderRadius: BorderRadius.circular(8),
+              splashColor: Colors.white.withOpacity(0.5),
+              highlightColor: Colors.white.withOpacity(0.3),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 24,
+                ),
+                child: const Text(
+                  "Cancel Ride",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-            ),
-            child: const Text(
-              "Cancel Ride",
-              style: TextStyle(color: Colors.white, fontSize: 16),
             ),
           ),
         ],

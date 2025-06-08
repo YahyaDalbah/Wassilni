@@ -1,4 +1,3 @@
-// top_drawer_content.dart
 import 'package:flutter/material.dart';
 
 class MenuDrawerContent extends StatelessWidget {
@@ -32,9 +31,9 @@ class MenuDrawerContent extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            _buildDrawerItem(Icons.logout, 'Logout', onLogout),
             _buildDrawerItem(Icons.person, 'Profile', onProfile),
             _buildDrawerItem(Icons.directions_car, 'Rides', onRides),
-            _buildDrawerItem(Icons.logout, 'Logout', onLogout),
           ],
         ),
       ),

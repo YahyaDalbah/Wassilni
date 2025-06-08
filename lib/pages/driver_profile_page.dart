@@ -29,7 +29,7 @@ class DriverProfilePage extends StatelessWidget {
       final query =
           await FirebaseFirestore.instance
               .collection('rides')
-              .where('driverId', isEqualTo: userId) // Changed to driverId
+              .where('driverId', isEqualTo: userId)
               .where('status', isEqualTo: 'completed')
               .where(
                 'timestamps.requested',
@@ -58,13 +58,6 @@ class DriverProfilePage extends StatelessWidget {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.currentUser;
 
-    print(
-      'User is online: ${Provider.of<UserProvider>(context, listen: false).currentUser?.isOnline}',
-    );
-    print(
-      'User ID is ${Provider.of<UserProvider>(context, listen: false).currentUser?.id}',
-    );
-
     return Scaffold(
       backgroundColor: Colors.black,
       body:
@@ -80,10 +73,7 @@ class DriverProfilePage extends StatelessWidget {
                     pinned: true,
                     backgroundColor: Colors.transparent,
                     leading: IconButton(
-                      icon: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white, // Make the arrow white
-                      ),
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     flexibleSpace: FlexibleSpaceBar(
@@ -131,45 +121,6 @@ class DriverProfilePage extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildSectionTitle('Account Information'),
-
-                          _buildInfoCard(
-                            children: [
-                              _buildInfoRow(
-                                'Status',
-                                user.isOnline ? 'Online' : 'Offline',
-                                statusColor:
-                                    user.isOnline ? Colors.green : Colors.red,
-                              ),
-                              _buildInfoRow(
-                                'Location',
-                                '${user.location.latitude.toStringAsFixed(4)}, '
-                                    '${user.location.longitude.toStringAsFixed(4)}',
-                              ),
-                            ],
-                          ),
-                          if (user.type == UserType.driver) ...[
-                            const SizedBox(height: 20),
-                            _buildSectionTitle('Vehicle Information'),
-                            _buildInfoCard(
-                              children: [
-                                _buildInfoRow(
-                                  'Make',
-                                  user.vehicle['make'] ?? 'Not set',
-                                ),
-                                _buildInfoRow(
-                                  'Model',
-                                  user.vehicle['model'] ?? 'Not set',
-                                ),
-                                _buildInfoRow(
-                                  'License Plate',
-                                  user.vehicle['licensePlate'] ?? 'Not set',
-                                ),
-                              ],
-                            ),
-                          ],
-                          // Earnings Section
-                          const SizedBox(height: 20),
                           _buildSectionTitle('Earnings'),
                           FutureBuilder<List<double>>(
                             future: Future.wait([
@@ -210,6 +161,45 @@ class DriverProfilePage extends StatelessWidget {
                               return _buildEarningsCards(fares);
                             },
                           ),
+
+                          const SizedBox(height: 20),
+                          _buildSectionTitle('Account Information'),
+
+                          _buildInfoCard(
+                            children: [
+                              _buildInfoRow(
+                                'Status',
+                                user.isOnline ? 'Online' : 'Offline',
+                                statusColor:
+                                    user.isOnline ? Colors.green : Colors.red,
+                              ),
+                              _buildInfoRow(
+                                'Location',
+                                '${user.location.latitude.toStringAsFixed(4)}, '
+                                    '${user.location.longitude.toStringAsFixed(4)}',
+                              ),
+                            ],
+                          ),
+                          if (user.type == UserType.driver) ...[
+                            const SizedBox(height: 20),
+                            _buildSectionTitle('Vehicle Information'),
+                            _buildInfoCard(
+                              children: [
+                                _buildInfoRow(
+                                  'Make',
+                                  user.vehicle['make'] ?? 'Not set',
+                                ),
+                                _buildInfoRow(
+                                  'Model',
+                                  user.vehicle['model'] ?? 'Not set',
+                                ),
+                                _buildInfoRow(
+                                  'License Plate',
+                                  user.vehicle['licensePlate'] ?? 'Not set',
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
                       ),
                     ),

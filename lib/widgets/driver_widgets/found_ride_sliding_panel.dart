@@ -49,35 +49,45 @@ Widget foundRideSlidingPanel({
       const Spacer(),
       Column(
         children: [
-          ElevatedButton(
-            onPressed: onAcceptRide,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              minimumSize: const Size(300, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+          Material(
+            color: Colors.green,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: onAcceptRide,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: Colors.white.withOpacity(0.5),
+              highlightColor: Colors.white.withOpacity(0.3),
+              child: Container(
+                width: 300,
+                height: 55,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.center,
+                child: const Text(
+                  "Accept Ride",
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
-            ),
-            child: const Text(
-              "Accept Ride",
-              style: TextStyle(fontSize: 16, color: Colors.white),
             ),
           ),
           const SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: onCancelRide,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(vertical: 15),
-              minimumSize: const Size(300, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+          Material(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: onCancelRide,
+              borderRadius: BorderRadius.circular(20),
+              splashColor: Colors.white.withOpacity(0.5),
+              highlightColor: Colors.white.withOpacity(0.3),
+              child: Container(
+                width: 300,
+                height: 55,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                alignment: Alignment.center,
+                child: const Text(
+                  "Cancel",
+                  style: TextStyle(fontSize: 16, color: Colors.white),
+                ),
               ),
-            ),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(fontSize: 16, color: Colors.white),
             ),
           ),
         ],
