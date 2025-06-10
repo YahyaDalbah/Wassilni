@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:wassilni/pages/rider_screen.dart';
 import 'package:wassilni/providers/user_provider.dart';
 
 class ProfilePage extends StatelessWidget {
@@ -49,7 +48,7 @@ class ProfilePage extends StatelessWidget {
       });
     } catch (e) {
       debugPrint('Error calculating fare total: $e');
-      return 0.0; // Return 0 if there's an error
+      return 0.0; // Return 0 if there's an error to avoid breaking the UI
     }
   }
 

@@ -1,8 +1,6 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserProvider extends ChangeNotifier {
@@ -23,10 +21,11 @@ class UserProvider extends ChangeNotifier {
       cleanPhoneNumber = '+$cleanPhoneNumber';
     }
 
-    final querySnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('phone', isEqualTo: cleanPhoneNumber)
-        .get();
+    final querySnapshot =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .where('phone', isEqualTo: cleanPhoneNumber)
+            .get();
 
     if (querySnapshot.docs.isNotEmpty) {
       final userDoc = querySnapshot.docs.first;
@@ -34,12 +33,12 @@ class UserProvider extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('logged_in_phone', cleanPhoneNumber);
       await prefs.setString('user_id', userDoc.id);
-      
+
       notifyListeners();
     } else {
       throw Exception('No user found with this phone number');
     }
-}
+  }
 
   Future<bool> initializeFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
@@ -47,10 +46,11 @@ class UserProvider extends ChangeNotifier {
     final userId = prefs.getString('user_id');
 
     if (phone != null && userId != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .get();
 
       if (userDoc.exists) {
         _currentUser = UserModel.fromFireStore(userDoc);
@@ -70,12 +70,13 @@ class UserProvider extends ChangeNotifier {
   }
 
   Future<void> updateOnlineStatus(bool isOnline) async {
+    currentUser!.isOnline = isOnline;
+    notifyListeners();
     if (_currentUser != null) {
       await FirebaseFirestore.instance
           .collection('users')
           .doc(_currentUser!.id)
           .update({'isOnline': isOnline});
-      notifyListeners();
     }
   }
 }

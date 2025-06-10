@@ -4,7 +4,6 @@ import 'package:crypto/crypto.dart';
 import 'package:wassilni/helpers/code_verification_handler.dart';
 import 'dart:convert';
 import 'package:wassilni/services/verification_service.dart';
-import '../rider_screen.dart';
 import 'package:wassilni/widgets/verification/verification_app_bar.dart';
 import 'package:wassilni/widgets/verification/verification_header.dart';
 import 'package:wassilni/widgets/verification/verify_button.dart';

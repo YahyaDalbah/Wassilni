@@ -1,11 +1,10 @@
-// rides_history.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:wassilni/models/user_model.dart';
 import 'package:wassilni/providers/user_provider.dart';
-import 'package:wassilni/services/ride_history_service.dart';
+import 'package:wassilni/services/rider_history_service.dart';
 
 class RidesHistory extends StatefulWidget {
   const RidesHistory({super.key});
@@ -17,7 +16,7 @@ class RidesHistory extends StatefulWidget {
 class _RidesHistoryState extends State<RidesHistory>
     with WidgetsBindingObserver {
   final RideHistoryService _rideService = RideHistoryService();
-  int? _lastActiveIndex;
+  //int? _lastActiveIndex;
   List<QueryDocumentSnapshot> _rides = [];
   DocumentSnapshot? _lastDocument;
   bool _isLoading = false;
