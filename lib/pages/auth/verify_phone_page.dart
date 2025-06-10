@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-//import 'package:crypto/crypto.dart';
+import 'package:crypto/crypto.dart';
 import 'package:wassilni/helpers/code_verification_handler.dart';
-//import 'dart:convert';
+import 'dart:convert';
 import 'package:wassilni/services/verification_service.dart';
 import 'package:wassilni/widgets/verification/verification_app_bar.dart';
 import 'package:wassilni/widgets/verification/verification_header.dart';
@@ -69,11 +69,11 @@ class _VerifyPhonePageState extends State<VerifyPhonePage> {
     }
   }
 
-  /*String _hashPassword(String password) {
+  String _hashPassword(String password) {
     final bytes = utf8.encode(password); 
     final hash = sha256.convert(bytes); 
     return hash.toString();
-  }*/
+  }
 
   @override
   Widget build(BuildContext context) {
